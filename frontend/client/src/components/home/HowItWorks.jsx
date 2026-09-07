@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export const HowItWorks = () => {
   const steps = [
@@ -53,9 +54,9 @@ export const HowItWorks = () => {
         </div>
 
         <div className="work-btn">
-          <a href="/find" className="start-btn">
+          <Link to="/find" className="start-btn">
             Find Your Tutor <i className="fa-solid fa-arrow-right"></i>
-          </a>
+          </Link>
         </div>
       </div>
     </section>

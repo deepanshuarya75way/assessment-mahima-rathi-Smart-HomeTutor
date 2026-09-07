@@ -277,7 +277,7 @@ export const AdminUsersTab = ({ onRoleChange, onDeleteUser, onFilterChange }) =>
                             onClick={() => handleToggleChatUnlock(user._id)}
                             title="Toggle Admin Chat Unlock"
                           >
-                            {user.chatUnlockedByAdmin ? '🔓 Chat Unlocked' : '🔒 Unlock Chat'}
+                            {user.chatUnlockedByAdmin ? 'Chat Unlocked' : 'Unlock Chat'}
                           </button>
                           <button
                             className="dash-btn dash-btn-outline"

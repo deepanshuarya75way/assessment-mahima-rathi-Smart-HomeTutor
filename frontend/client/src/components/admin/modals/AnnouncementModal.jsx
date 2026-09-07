@@ -23,7 +23,7 @@ export const AnnouncementModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       const res = await adminApi.sendBulkNotification({ title, message, targetRole });
       if (res.success) {
-        setFeedback({ text: '✅ Broadcast announcement sent successfully!', type: 'success' });
+        setFeedback({ text: 'Broadcast announcement sent successfully!', type: 'success' });
         if (onSuccess) onSuccess();
         setTimeout(() => {
           onClose();

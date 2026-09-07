@@ -8,6 +8,7 @@ export const OverviewTab = ({
   referralCode,
   referralEarnings,
   referredCount = 0,
+  referredUsers = [],
   onOpenAIRecommendations,
   onOpenReviewModal,
   onStartVideoCall,
@@ -51,7 +52,7 @@ export const OverviewTab = ({
   const statItems = [
     { label: 'Upcoming Lessons', value: stats ? stats.upcomingClassesCount || 0 : 0, sub: 'Active bookings', icon: 'fa-calendar-check', bg: '#e0f2fe', color: '#0284c7' },
     { label: 'Learning Hours', value: stats ? `${stats.completedClassesCount || 0} hrs` : '0 hrs', sub: 'Active learning log', icon: 'fa-user-clock', bg: '#dcfce7', color: '#15803d' },
-    { label: 'Active Tutors', value: stats ? `${stats.activeTutorsCount || 0} Tutors` : '0 Tutors', sub: 'Verified instructors', icon: 'fa-graduation-cap', bg: '#fef3c7', color: '#b45309' },
+    { label: 'Active Tutors', value: stats ? `${stats.activeTutorsCount ?? stats.activeTutorCount ?? 0} Tutors` : '0 Tutors', sub: 'Active regular instructors', icon: 'fa-graduation-cap', bg: '#fef3c7', color: '#b45309' },
     { label: 'Attendance Rate', value: stats ? `${stats.attendancePercentage || 100}%` : '100%', sub: 'Overall attendance', icon: 'fa-chart-line', bg: '#f3e8ff', color: '#6b21a8' },
   ];
 
@@ -276,6 +277,7 @@ export const OverviewTab = ({
             referralCode={referralCode}
             referralEarnings={referralEarnings}
             referredCount={referredCount}
+            referredUsers={referredUsers}
             userRole="student"
           />
         </div>

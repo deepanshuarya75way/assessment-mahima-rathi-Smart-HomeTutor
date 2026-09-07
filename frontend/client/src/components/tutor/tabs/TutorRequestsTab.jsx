@@ -1,4 +1,5 @@
 import React from 'react';
+import { FiMail, FiPhone } from 'react-icons/fi';
 
 export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectRequest }) => {
   return (
@@ -43,8 +44,8 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                     <tr key={req._id}>
                       <td>
                         <div style={{ fontWeight: '700', color: '#0f2a4a', fontSize: '14px' }}>{studentName}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>📧 {studentEmail}</div>
-                        {studentPhone !== 'N/A' && <div style={{ fontSize: '12px', color: '#64748b' }}>📞 {studentPhone}</div>}
+                        <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}><FiMail size={12} /> {studentEmail}</div>
+                        {studentPhone !== 'N/A' && <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}><FiPhone size={12} /> {studentPhone}</div>}
                       </td>
                       <td>
                         <div style={{ fontWeight: '700', color: '#0f172a' }}>{subjectName}</div>

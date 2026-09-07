@@ -62,6 +62,21 @@ export const AdminDashboardPage = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const messageParam = params.get('message');
+    if (errorParam || messageParam) {
+      const msg = errorParam || messageParam;
+      if (window.showCustomAlert) {
+        window.showCustomAlert(msg, errorParam ? 'Access Denied' : 'Notification', errorParam ? 'error' : 'info');
+      }
+      params.delete('error');
+      params.delete('message');
+      const newSearch = params.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     loadAllAdminData();
   }, []);
 

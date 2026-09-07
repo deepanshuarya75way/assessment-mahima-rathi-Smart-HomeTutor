@@ -6,6 +6,7 @@ const Transaction = require("../models/Transaction");
 const User = require("../models/User");
 const BookingRequest = require("../models/BookingRequest");
 const TutorProfile = require("../models/TutorProfile");
+const Referral = require("../models/Referral");
 const { createNotification, createAdminNotification } = require("../utils/notificationHelper");
 
 const { calculateTutorFeeSummary } = require("./studentController");
@@ -263,7 +264,7 @@ exports.verifyPayment = async (req, res) => {
     });
 
     // 4. Process Payment-Based Referral Reward (if student was referred and pending reward)
-    await processReferralRewardOnPayment(userId, req.app);
+    await processReferralRewardOnPayment(userId, payment, req.app);
 
     return res.status(200).json({
       success: true,
@@ -436,75 +437,107 @@ exports.getAdminPaymentHistory = async (req, res) => {
   }
 };
 
-const processReferralRewardOnPayment = async (studentId, app) => {
+const processReferralRewardOnPayment = async (payerId, paymentObj, app) => {
   try {
-    const student = await User.findOneAndUpdate(
+    if (!payerId) return null;
+
+    const payer = await User.findById(payerId);
+    if (!payer || !payer.referredBy) {
+      return null;
+    }
+
+    // Find referrer by referral code
+    const referrer = await User.findOne({ referralCode: payer.referredBy });
+    if (!referrer) {
+      console.warn(`Referrer with code ${payer.referredBy} not found for user ${payerId}`);
+      return null;
+    }
+
+    // Find or create Referral record
+    let referral = await Referral.findOne({ referredUser: payer._id });
+    if (!referral) {
+      referral = await Referral.create({
+        referrer: referrer._id,
+        referredUser: payer._id,
+        referredRole: (payer.role || "student").toLowerCase(),
+        referralCode: payer.referredBy,
+        signupDate: payer.createdAt || new Date(),
+        rewardStatus: payer.referralRewardStatus === "Rewarded" ? "Rewarded" : "Pending",
+      }).catch(() => null);
+    }
+
+    if (!referral) {
+      referral = await Referral.findOne({ referredUser: payer._id });
+    }
+
+    // PREVENT DUPLICATE REWARDS! Check if reward was already given
+    if (!referral || referral.rewardStatus === "Rewarded") {
+      return null;
+    }
+
+    // Calculate reward based on the REFERRED USER'S ROLE!
+    // Student referred -> ₹50
+    // Tutor referred -> ₹100
+    const rawRole = (referral.referredRole || payer.role || "student").toLowerCase();
+    const rewardAmount = rawRole === "tutor" ? 100 : 50;
+    const paymentAmt = paymentObj ? Number(paymentObj.amount || 0) : 0;
+    const paymentIdVal = paymentObj ? paymentObj._id : null;
+
+    // Atomically mark Referral record as Rewarded
+    const updatedReferral = await Referral.findOneAndUpdate(
+      { _id: referral._id, rewardStatus: "Pending" },
       {
-        _id: studentId,
-        referralRewardStatus: "Pending",
-        referredBy: { $exists: true, $ne: "" },
+        rewardStatus: "Rewarded",
+        rewardAmount: rewardAmount,
+        firstPaymentId: paymentIdVal,
+        firstPaymentAmount: paymentAmt,
+        rewardedAt: new Date(),
       },
-      { referralRewardStatus: "Rewarded" },
       { returnDocument: "after" }
     );
 
-    if (!student || !student.referredBy) {
+    if (!updatedReferral) {
+      // Already rewarded in concurrent call
       return null;
     }
 
-    const referrer = await User.findOne({ referralCode: student.referredBy });
-    if (!referrer) {
-      console.warn(`Referrer with code ${student.referredBy} not found for student ${studentId}`);
-      return null;
-    }
+    // Update Payer referralRewardStatus
+    payer.referralRewardStatus = "Rewarded";
+    await payer.save();
 
-    // Credit Student ₹50 Welcome Bonus
-    student.walletBalance = (student.walletBalance || 0) + 50;
-    await student.save();
-
-    // Credit Referrer ₹100 Referral Bonus
-    referrer.walletBalance = (referrer.walletBalance || 0) + 100;
-    referrer.referralEarnings = (referrer.referralEarnings || 0) + 100;
+    // Credit Referrer's Wallet & Referral Earnings
+    referrer.walletBalance = (referrer.walletBalance || 0) + rewardAmount;
+    referrer.referralEarnings = (referrer.referralEarnings || 0) + rewardAmount;
     await referrer.save();
 
-    // Ledger Records
-    await Transaction.create({
-      user: student._id,
-      type: "Credit",
-      amount: 50,
-      description: "Referral Welcome Bonus",
-      status: "Completed",
-    });
+    const payerName = payer.name || payer.email || "Referred User";
 
+    // Ledger Transaction Record for Referrer
     await Transaction.create({
       user: referrer._id,
-      type: "Credit",
-      amount: 100,
-      description: "Referral Bonus for successful student payment",
+      type: "Referral Bonus",
+      amount: rewardAmount,
+      description: `Referral Bonus for referring ${payerName} (${rawRole === "tutor" ? "Tutor" : "Student"})`,
       status: "Completed",
     });
 
-    // Notifications
-    await createNotification({
-      userId: student._id,
-      title: "Referral Reward 🎉",
-      message: "You received ₹50 because your referred signup completed a tuition payment.",
-      type: "payment",
-      actionUrl: "/dashboard/student?tab=payments",
-      app,
-    });
+    // Send Notification to Referrer
+    const referrerDashboardUrl = referrer.role === "tutor" ? "/dashboard/tutor?tab=referrals" : "/dashboard/student?tab=payments";
+    const notifMessage = rawRole === "tutor"
+      ? `Referral Bonus Received 🎉 You earned ₹100 because ${payerName} joined using your referral link and completed their first successful payment.`
+      : `Referral Bonus Received 🎉 You earned ₹50 because ${payerName} joined using your referral link and completed their first successful payment.`;
 
-    const referrerDashboardUrl = referrer.role === "tutor" ? "/dashboard/tutor?tab=overview" : "/dashboard/student?tab=overview";
     await createNotification({
+      user: referrer._id,
       userId: referrer._id,
-      title: "Referral Bonus 🎉",
-      message: `You earned ₹100 because the student referred through your link (${student.name}) completed a tuition payment.`,
+      title: "Referral Bonus Received 🎉",
+      message: notifMessage,
       type: "payment",
       actionUrl: referrerDashboardUrl,
-      app,
+      app: app || (paymentObj && paymentObj.app),
     });
 
-    return { student, referrer };
+    return { payer, referrer, rewardAmount };
   } catch (err) {
     console.error("Process Referral Reward Error:", err);
     return null;
@@ -639,7 +672,7 @@ exports.payWithWallet = async (req, res) => {
       app: req.app,
     });
 
-    await processReferralRewardOnPayment(userId, req.app);
+    await processReferralRewardOnPayment(userId, payment, req.app);
 
     return res.status(200).json({
       success: true,

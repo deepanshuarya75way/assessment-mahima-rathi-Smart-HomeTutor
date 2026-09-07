@@ -97,7 +97,7 @@ export const VerifyOtp = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setAlert({ type: 'success', message: `🎉 ${data.message || 'Email verified successfully!'} Redirecting to login...` });
+        setAlert({ type: 'success', message: `${data.message || 'Email verified successfully!'} Redirecting to login...` });
         setTimeout(() => {
           navigate('/login?message=' + encodeURIComponent('Email verified successfully! You can now log in.'));
         }, 1500);

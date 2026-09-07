@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiCheck, FiPlus, FiCheckCircle, FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 
 export const TutorApplicationForm = ({ onSuccess }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -604,9 +605,9 @@ export const TutorApplicationForm = ({ onSuccess }) => {
       {submitSuccess ? (
         <div className="tr-success-card">
           <div className="tr-success-icon-circle">
-            <i className="fa-solid fa-circle-check"></i>
+            <FiCheckCircle size={40} />
           </div>
-          <h2>✓ Registration Submitted</h2>
+          <h2>Registration Submitted</h2>
           <p>
             Your tutor application has been submitted successfully.
           </p>
@@ -1110,7 +1111,7 @@ export const TutorApplicationForm = ({ onSuccess }) => {
                           className={`tr-pill-btn sm ${selected ? 'active' : ''}`}
                           onClick={() => handleArrayToggle('subjectsYouTeach', sub)}
                         >
-                          {selected ? '✓ ' : '+ '}{sub}
+                          {selected ? <FiCheck size={14} style={{ marginRight: '4px' }} /> : <FiPlus size={14} style={{ marginRight: '4px' }} />}{sub}
                         </button>
                       );
                     })}
@@ -1203,7 +1204,7 @@ export const TutorApplicationForm = ({ onSuccess }) => {
                           className={`tr-pill-btn sm ${isSelected ? 'active' : ''}`}
                           onClick={() => setFormData((prev) => ({ ...prev, studentLevel: lvl }))}
                         >
-                          {isSelected ? '✓ ' : ''}{lvl} Level
+                          {isSelected ? <FiCheck size={14} style={{ marginRight: '4px' }} /> : null}{lvl} Level
                         </button>
                       );
                     })}
@@ -1683,14 +1684,14 @@ export const TutorApplicationForm = ({ onSuccess }) => {
           {/* ========================================================================= */}
           <div className="tr-step-actions-bar">
             {currentStep > 1 && (
-              <button type="button" className="tr-btn tr-btn-outline" onClick={handlePrev}>
-                ← Previous
+              <button type="button" className="tr-btn tr-btn-outline" onClick={handlePrev} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <FiArrowLeft /> Previous
               </button>
             )}
 
             {currentStep < 5 ? (
-              <button type="button" className="tr-btn tr-btn-primary" onClick={handleNext} style={{ marginLeft: 'auto' }}>
-                Next Step →
+              <button type="button" className="tr-btn tr-btn-primary" onClick={handleNext} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                Next Step <FiArrowRight />
               </button>
             ) : (
               <button

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiCheck, FiPlus, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { tutorApi } from '../../../services/tutorApi';
 
 const PRESET_SUBJECTS = [
@@ -392,7 +393,7 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
                               cursor: 'pointer',
                             }}
                           >
-                            {isAdded ? '✓ ' : '+ '} {preset}
+                            {isAdded ? <FiCheck size={14} style={{ display: 'inline', marginRight: '4px' }} /> : <FiPlus size={14} style={{ display: 'inline', marginRight: '4px' }} />} {preset}
                           </button>
                         );
                       })}
@@ -424,7 +425,7 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
                             cursor: 'pointer',
                           }}
                         >
-                          {isSelected ? '☑ ' : '☐ '} {cls}
+                          {isSelected ? <FiCheckSquare size={14} style={{ display: 'inline', marginRight: '4px' }} /> : <FiSquare size={14} style={{ display: 'inline', marginRight: '4px' }} />} {cls}
                         </button>
                       );
                     })}
@@ -455,7 +456,7 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
                             cursor: 'pointer',
                           }}
                         >
-                          {isSelected ? '☑ ' : '☐ '} {b}
+                          {isSelected ? <FiCheckSquare size={14} style={{ display: 'inline', marginRight: '4px' }} /> : <FiSquare size={14} style={{ display: 'inline', marginRight: '4px' }} />} {b}
                         </button>
                       );
                     })}

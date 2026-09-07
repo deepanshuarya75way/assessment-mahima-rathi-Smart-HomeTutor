@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiLock, FiClock, FiXCircle } from 'react-icons/fi';
 import '../../styles/tutor-dashboard.css';
 import { tutorApi } from '../../services/tutorApi';
 import { TutorSidebar } from '../../components/tutor/TutorSidebar';
@@ -63,6 +64,21 @@ export const TutorDashboardPage = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const messageParam = params.get('message');
+    if (errorParam || messageParam) {
+      const msg = errorParam || messageParam;
+      if (window.showCustomAlert) {
+        window.showCustomAlert(msg, errorParam ? 'Access Denied' : 'Notification', errorParam ? 'error' : 'info');
+      }
+      params.delete('error');
+      params.delete('message');
+      const newSearch = params.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     loadDashboardData();
 
     const handleCustomEvent = (e) => {
@@ -227,7 +243,7 @@ export const TutorDashboardPage = () => {
       return (
         <div className="dash-tab-content" style={{ display: 'block' }}>
           <div className="dash-card" style={{ textAlign: 'center', padding: '50px 20px', maxWidth: '700px', margin: '40px auto', borderRadius: '16px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+            <FiLock size={48} style={{ color: '#0284c7', marginBottom: '16px' }} />
             <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f2a4a', marginBottom: '10px' }}>Tutor Dashboard </h2>
             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Complete Registration</h3>
             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.6' }}>
@@ -249,8 +265,8 @@ export const TutorDashboardPage = () => {
       return (
         <div className="dash-tab-content" style={{ display: 'block' }}>
           <div className="dash-card" style={{ textAlign: 'center', padding: '50px 20px', maxWidth: '700px', margin: '40px auto', borderRadius: '16px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f2a4a', marginBottom: '12px' }}>Application Under Review ⏳</h2>
+            <FiClock size={48} style={{ color: '#f59e0b', marginBottom: '16px' }} />
+            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f2a4a', marginBottom: '12px' }}>Application Under Review</h2>
             <p style={{ fontSize: '15px', color: '#475569', marginBottom: '20px', lineHeight: '1.6' }}>
               Your tutor application is currently being reviewed by the admin.
             </p>
@@ -266,7 +282,7 @@ export const TutorDashboardPage = () => {
       return (
         <div className="dash-tab-content" style={{ display: 'block' }}>
           <div className="dash-card" style={{ textAlign: 'center', padding: '50px 20px', maxWidth: '700px', margin: '40px auto', borderRadius: '16px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
+            <FiXCircle size={48} style={{ color: '#dc2626', marginBottom: '16px' }} />
             <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#dc2626', marginBottom: '12px' }}>Application Rejected</h2>
             <p style={{ fontSize: '15px', color: '#475569', marginBottom: '20px', lineHeight: '1.6' }}>
               Your tutor application was not approved.

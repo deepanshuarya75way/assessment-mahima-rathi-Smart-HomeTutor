@@ -45,7 +45,7 @@ export const TutorRatesTab = () => {
 
         if (p.fee) setHourlyRate(String(p.fee));
         if (p.coordinates?.lat) {
-          setGpsStatus(`📍 Saved Coordinates: (${p.coordinates.lat.toFixed(4)}, ${p.coordinates.lng.toFixed(4)})`);
+          setGpsStatus(`Saved Coordinates: (${p.coordinates.lat.toFixed(4)}, ${p.coordinates.lng.toFixed(4)})`);
         }
       }
     } catch (err) {
@@ -60,23 +60,23 @@ export const TutorRatesTab = () => {
 
   const acquireGPSLocation = () => {
     if (!navigator.geolocation) {
-      setToastMessage('⚠️ Geolocation is not supported by your browser.');
+      setToastMessage('Geolocation is not supported by your browser.');
       return;
     }
-    setGpsStatus('📍 Acquiring GPS coordinates...');
+    setGpsStatus('Acquiring GPS coordinates...');
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setFormData((prev) => ({ ...prev, lat, lng }));
-        setGpsStatus(`📍 GPS Saved: (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
-        setToastMessage(`📍 GPS Coordinates Acquired: (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+        setGpsStatus(`GPS Saved: (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+        setToastMessage(`GPS Coordinates Acquired: (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
       },
       (err) => {
         console.error('GPS Error:', err);
-        setGpsStatus('⚠️ GPS Permission Denied (using fallback city location)');
-        setToastMessage('⚠️ GPS Permission Denied. Please check browser permissions.');
+        setGpsStatus('GPS Permission Denied (using fallback city location)');
+        setToastMessage('GPS Permission Denied. Please check browser permissions.');
       }
     );
   };
@@ -89,7 +89,7 @@ export const TutorRatesTab = () => {
     try {
       const res = await tutorApi.saveTutorProfile(formData);
       if (res.success) {
-        setToastMessage('✅ Tutor Profile & GPS Saved Successfully!');
+        setToastMessage('Tutor Profile & GPS Saved Successfully!');
       } else {
         setToastMessage(res.message || 'Failed to save profile.');
       }

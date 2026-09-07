@@ -28,6 +28,16 @@ export const LoginPage = () => {
     if (messageParam) setInfoMessage(messageParam);
     if (unverifiedParam) setUnverifiedEmail(unverifiedParam);
 
+    if (errorParam || messageParam || unverifiedParam) {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.delete('error');
+      newParams.delete('message');
+      newParams.delete('unverifiedEmail');
+      const newSearch = newParams.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     // Scroll reveal observer
     const observer = new IntersectionObserver(
       (entries) => {
@@ -83,7 +93,7 @@ export const LoginPage = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        window.location.href = data.redirectUrl || `/dashboard/${role}`;
+        window.location.replace(data.redirectUrl || `/dashboard/${role}`);
       } else {
         setErrorMessage(data.message || 'Login failed. Please check your credentials.');
         if (data.requiresVerification && data.email) {

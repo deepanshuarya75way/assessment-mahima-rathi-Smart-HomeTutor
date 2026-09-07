@@ -183,7 +183,7 @@ export const TutorAbout = ({ tutor = {}, onBookClick, onRegularClick, isDemoUsed
             style={{ flex: 1, opacity: 0.65, cursor: 'not-allowed', background: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' }}
             title="You have already attended a demo class with this tutor. You can book Regular Classes instead."
           >
-            <CalendarDaysIcon size={18} color="#64748b" /> Demo Completed ✓
+            <CalendarDaysIcon size={18} color="#64748b" /> Demo Completed
           </button>
         ) : (
           <button

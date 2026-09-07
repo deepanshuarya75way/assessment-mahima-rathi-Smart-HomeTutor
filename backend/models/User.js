@@ -29,6 +29,52 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    dob: {
+      type: String,
+      default: "",
+    },
+
+    gender: {
+      type: String,
+      default: "",
+    },
+
+    city: {
+      type: String,
+      default: "",
+    },
+
+    location: {
+      type: String,
+      default: "",
+    },
+
+    grade: {
+      type: String,
+      default: "",
+    },
+
+    profileImage: {
+      type: String,
+      default: "",
+    },
+
+    avatar: {
+      type: String,
+      default: "",
+    },
+
+    accountStatus: {
+      type: String,
+      enum: ["Active", "Discontinued"],
+      default: "Active",
+    },
+
+    discontinuedAt: {
+      type: Date,
+      default: null,
+    },
+
     password: {
       type: String,
       required: true,

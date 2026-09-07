@@ -296,8 +296,8 @@ export const CreateScheduleModal = ({ isOpen, onClose, onSuccess, userRole = 'tu
                   color: formData.mode === 'Online' ? '#0369a1' : '#b45309',
                 }}
               >
-                <option value="Online">🎥 Online (WebRTC Video)</option>
-                <option value="Offline">🏫 Offline (In-Person / Home)</option>
+                <option value="Online">Online (WebRTC Video)</option>
+                <option value="Offline">Offline (In-Person / Home)</option>
               </select>
             </div>
 

@@ -69,7 +69,7 @@ export const SubjectsPage = () => {
     {
       id: 'c11-12-sci',
       title: 'Class 11–12',
-      badge: '🔬 Science',
+      badge: 'Science',
       icon: 'fa-flask',
       topics: ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English'],
       link: '/find?grade=Class+11-12&subject=Physics',
@@ -77,7 +77,7 @@ export const SubjectsPage = () => {
     {
       id: 'c11-12-com',
       title: 'Class 11–12',
-      badge: '💼 Commerce',
+      badge: 'Commerce',
       icon: 'fa-briefcase',
       topics: ['Accountancy', 'Business Studies', 'Economics', 'Mathematics', 'Entrepreneurship', 'Informatics Prac.', 'English'],
       link: '/find?grade=Class+11-12&subject=Accounts',
@@ -85,7 +85,7 @@ export const SubjectsPage = () => {
     {
       id: 'c11-12-hum',
       title: 'Class 11–12',
-      badge: '🎨 Humanities',
+      badge: 'Humanities',
       icon: 'fa-palette',
       topics: ['History', 'Political Science', 'Geography', 'Sociology', 'Psychology', 'Economics', 'English'],
       link: '/find?grade=Class+11-12&subject=History',

@@ -24,8 +24,8 @@ export const studentApi = {
     if (filters.feeMax) queryParams.append('fee', filters.feeMax);
     if (filters.search) queryParams.append('search', filters.search);
     if (filters.location) queryParams.append('location', filters.location);
-    if (filters.lat) queryParams.append('lat', filters.lat);
-    if (filters.lng) queryParams.append('lng', filters.lng);
+    if (filters.lat !== null && filters.lat !== undefined && filters.lat !== '') queryParams.append('lat', filters.lat);
+    if (filters.lng !== null && filters.lng !== undefined && filters.lng !== '') queryParams.append('lng', filters.lng);
     if (filters.radius && filters.radius !== 'all') queryParams.append('radius', filters.radius);
 
     const res = await fetch(`/api/tutor/all?${queryParams.toString()}`);

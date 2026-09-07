@@ -1,7 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 
 export const Testimonials = () => {
   const trackRef = useRef(null);
+  const posRef = useRef(0);
+  const isPausedRef = useRef(false);
+  const isTransitioningRef = useRef(false);
+  const animFrameRef = useRef(null);
+  const resumeTimeoutRef = useRef(null);
+  const transitionTimeoutRef = useRef(null);
 
   const testimonials = [
     {
@@ -54,21 +60,98 @@ export const Testimonials = () => {
     },
   ];
 
-  // Duplicated array for seamless infinite marquee loop
-  const allCards = [...testimonials, ...testimonials];
+  // Tripled array for seamless infinite looping in both left & right directions
+  const allCards = [...testimonials, ...testimonials, ...testimonials];
+
+  const ITEM_STEP = 384; // 360px card width + 24px gap
+  const SINGLE_SET_WIDTH = testimonials.length * ITEM_STEP; // 2304px
+  const BASE_OFFSET = SINGLE_SET_WIDTH; // Start at middle set offset (2304px)
+
+  useEffect(() => {
+    posRef.current = BASE_OFFSET;
+    if (trackRef.current) {
+      trackRef.current.style.transform = `translateX(-${posRef.current}px)`;
+    }
+
+    let lastTime = performance.now();
+
+    const animate = (now) => {
+      const delta = now - lastTime;
+      lastTime = now;
+
+      if (!isPausedRef.current && !isTransitioningRef.current && trackRef.current) {
+        const speed = (35 * delta) / 1000; // ~35px/s continuous scroll
+        posRef.current += speed;
+
+        if (posRef.current >= SINGLE_SET_WIDTH * 2) {
+          posRef.current -= SINGLE_SET_WIDTH;
+        } else if (posRef.current < SINGLE_SET_WIDTH) {
+          posRef.current += SINGLE_SET_WIDTH;
+        }
+
+        trackRef.current.style.transform = `translateX(-${posRef.current}px)`;
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
+    };
+  }, [SINGLE_SET_WIDTH, BASE_OFFSET]);
 
   const shiftTrack = (direction) => {
     if (!trackRef.current) return;
-    const style = window.getComputedStyle(trackRef.current);
-    const matrix = new WebKitCSSMatrix(style.transform);
-    const amount = direction === 'left' ? 380 : -380;
-    trackRef.current.style.animationPlayState = 'paused';
-    trackRef.current.style.transform = `translateX(${matrix.m41 + amount}px)`;
-    setTimeout(() => {
-      if (trackRef.current) {
-        trackRef.current.style.animationPlayState = 'running';
+
+    isPausedRef.current = true;
+    isTransitioningRef.current = true;
+
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+    if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current);
+
+    // 'left' -> move towards left card (show previous card) => offset decreases
+    // 'right' -> move towards right card (show next card) => offset increases
+    const delta = direction === 'left' ? -ITEM_STEP : ITEM_STEP;
+    posRef.current += delta;
+
+    trackRef.current.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
+    trackRef.current.style.transform = `translateX(-${posRef.current}px)`;
+
+    transitionTimeoutRef.current = setTimeout(() => {
+      if (!trackRef.current) return;
+
+      trackRef.current.style.transition = 'none';
+
+      // Keep posRef cleanly within [SINGLE_SET_WIDTH, SINGLE_SET_WIDTH * 2]
+      while (posRef.current >= SINGLE_SET_WIDTH * 2) {
+        posRef.current -= SINGLE_SET_WIDTH;
       }
-    }, 2500);
+      while (posRef.current < SINGLE_SET_WIDTH) {
+        posRef.current += SINGLE_SET_WIDTH;
+      }
+      trackRef.current.style.transform = `translateX(-${posRef.current}px)`;
+
+      isTransitioningRef.current = false;
+
+      // Resume auto marquee after 3 seconds if not hovered
+      resumeTimeoutRef.current = setTimeout(() => {
+        isPausedRef.current = false;
+      }, 3000);
+    }, 400);
+  };
+
+  const handleMouseEnter = () => {
+    isPausedRef.current = true;
+  };
+
+  const handleMouseLeave = () => {
+    if (!isTransitioningRef.current) {
+      isPausedRef.current = false;
+    }
   };
 
   return (
@@ -81,7 +164,11 @@ export const Testimonials = () => {
         </div>
       </div>
 
-      <div className="testimonial-marquee-wrapper">
+      <div
+        className="testimonial-marquee-wrapper"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <div className="testimonial-marquee-track" ref={trackRef} id="testimonialMarqueeTrack">
           {allCards.map((item, idx) => (
             <div key={idx} className="testimonial-marquee-card">

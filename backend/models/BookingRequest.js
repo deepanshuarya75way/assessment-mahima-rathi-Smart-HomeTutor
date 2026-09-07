@@ -35,6 +35,8 @@ const bookingRequestSchema = new mongoose.Schema(
         "Rejected",
         "Rejected by Admin",
         "Rejected by Tutor",
+        "Cancelled",
+        "Discontinued",
       ],
       default: "Pending Admin Approval",
     },
@@ -107,5 +109,11 @@ const bookingRequestSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Indexes for high-frequency dashboard queries
+bookingRequestSchema.index({ student: 1, status: 1 });
+bookingRequestSchema.index({ tutor: 1, status: 1 });
+bookingRequestSchema.index({ tutorProfile: 1, status: 1 });
+bookingRequestSchema.index({ isTrial: 1, status: 1 });
 
 module.exports = mongoose.model("BookingRequest", bookingRequestSchema);

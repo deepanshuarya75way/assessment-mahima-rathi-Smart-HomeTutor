@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
+const Referral = require("../models/Referral");
 const { logUserActivity } = require("../utils/activityLogHelper");
 const { createNotification } = require("../utils/notificationHelper");
 const { sendVerificationEmail, sendPasswordResetEmail, isValidEmailFormat } = require("../utils/sendEmail");
@@ -168,33 +169,38 @@ exports.signup = async (req, res) => {
       }
     }
 
-    const fullName =
-      name ||
-      (firstName && lastName
-        ? `${firstName} ${lastName}`
-        : firstName || normalizedEmail.split("@")[0]);
+    let userFullName = (typeof name === "string" ? name : "").trim();
+    if (!userFullName) {
+      const fName = (typeof firstName === "string" ? firstName : "").trim();
+      const lName = (typeof lastName === "string" ? lastName : "").trim();
+      userFullName = `${fName} ${lName}`.trim();
+    }
+    if (!userFullName) {
+      userFullName = normalizedEmail.split("@")[0];
+    }
+
+    const cleanPhone = typeof phone === "string" ? phone.trim() : String(phone || "").trim();
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newReferralCode = "REF-" + Math.random().toString(36).substring(2, 8).toUpperCase();
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    console.log(`🎲 [OTP GENERATED] New user OTP generated for ${normalizedEmail}.`);
-
-    try {
-      console.log(`📤 [EMAIL SENDING STARTED] Sending verification email to ${normalizedEmail}...`);
-      await sendVerificationEmail({ to: normalizedEmail, otp: otpCode, name: fullName });
-      console.log(`✅ [EMAIL SENDING SUCCESSFUL] OTP email delivered to ${normalizedEmail}.`);
-    } catch (emailDeliveryErr) {
-      console.error(`❌ [EMAIL SERVICE ERROR] Delivery failed for ${normalizedEmail}:`, emailDeliveryErr.message);
-      const msg = "Failed to send verification email. Please try again.";
-      if (isJsonRequest) return res.status(500).json({ success: false, message: msg });
-      return res.redirect("/signup?error=" + encodeURIComponent(msg));
+    let newReferralCode = "REF-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 5) {
+      const checkRef = await User.findOne({ referralCode: newReferralCode });
+      if (!checkRef) {
+        isUnique = true;
+      } else {
+        newReferralCode = "REF-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+        attempts++;
+      }
     }
 
     const user = await User.create({
-      name: fullName,
+      name: userFullName,
       email: normalizedEmail,
-      phone: phone || "",
+      phone: cleanPhone,
       password: hashedPassword,
       role: requestedRole,
       tutorStatus: requestedRole === "tutor" ? "not_applied" : undefined,
@@ -208,6 +214,37 @@ exports.signup = async (req, res) => {
     });
 
     console.log(`💾 [OTP SAVED] User record created and OTP saved in database for ${normalizedEmail}. Expiry: 10 minutes.`);
+
+    try {
+      console.log(`📤 [EMAIL SENDING STARTED] Sending verification email to ${normalizedEmail}...`);
+      await sendVerificationEmail({ to: normalizedEmail, otp: otpCode, name: userFullName });
+      console.log(`✅ [EMAIL SENDING SUCCESSFUL] OTP email delivered to ${normalizedEmail}.`);
+    } catch (emailDeliveryErr) {
+      console.error(`❌ [EMAIL SERVICE ERROR] Delivery failed for ${normalizedEmail}:`, emailDeliveryErr.message);
+      const msg = "Failed to send verification email. Please try again.";
+      if (isJsonRequest) return res.status(500).json({ success: false, message: msg });
+      return res.redirect("/signup?error=" + encodeURIComponent(msg));
+    }
+
+    if (validReferredBy) {
+      try {
+        const referrerObj = await User.findOne({ referralCode: validReferredBy });
+        if (referrerObj) {
+          await Referral.create({
+            referrer: referrerObj._id,
+            referredUser: user._id,
+            referredRole: (user.role || "student").toLowerCase(),
+            referralCode: validReferredBy,
+            signupDate: new Date(),
+            rewardStatus: "Pending",
+            rewardAmount: 0,
+          });
+          console.log(`🎁 [REFERRAL RECORD CREATED] Linked ${user.email} (${user.role}) to referrer ${referrerObj.email}`);
+        }
+      } catch (refErr) {
+        console.error("Error creating Referral record on signup:", refErr.message);
+      }
+    }
 
     if (initialWallet > 0) {
       await Transaction.create({
@@ -241,11 +278,16 @@ exports.signup = async (req, res) => {
     return res.redirect("/signup?error=" + encodeURIComponent(msg));
   }
 };
+
 exports.login = async (req, res) => {
-  const isJsonRequest = req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json");
+  const isJsonRequest = Boolean(
+    req.xhr ||
+    (req.headers && req.headers.accept && req.headers.accept.includes("json")) ||
+    (req.headers && req.headers["content-type"]?.includes("json"))
+  );
 
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role } = req.body || {};
 
     if (!email || !password || !role) {
       const msg = "Please enter email, password and select your role.";
@@ -253,10 +295,19 @@ exports.login = async (req, res) => {
       return res.redirect("/login?error=" + encodeURIComponent(msg));
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const selectedRole = String(role).toLowerCase().trim();
+    const rawEmail = typeof email === "string" ? email : String(email || "");
+    const rawPassword = typeof password === "string" ? password : String(password || "");
+    const rawRole = typeof role === "string" ? role : String(role || "");
 
-  
+    const normalizedEmail = rawEmail.toLowerCase().trim();
+    const selectedRole = rawRole.toLowerCase().trim();
+
+    if (!normalizedEmail || !rawPassword || !selectedRole) {
+      const msg = "Please enter email, password and select your role.";
+      if (isJsonRequest) return res.status(400).json({ success: false, message: msg });
+      return res.redirect("/login?error=" + encodeURIComponent(msg));
+    }
+
     if (selectedRole === "admin") {
       const user = await User.findOne({ email: normalizedEmail });
       if (!user || user.role !== "admin") {
@@ -273,7 +324,14 @@ exports.login = async (req, res) => {
         return res.redirect("/login?error=" + encodeURIComponent(msg));
       }
 
-      const isMatch = await bcrypt.compare(password, user.password);
+      let isMatch = false;
+      try {
+        isMatch = await bcrypt.compare(rawPassword, user.password || "");
+      } catch (bcryptErr) {
+        console.error("Bcrypt compare error (admin):", bcryptErr);
+        isMatch = false;
+      }
+
       if (!isMatch) {
         const msg = "Invalid admin credentials.";
         await logUserActivity({
@@ -300,7 +358,6 @@ exports.login = async (req, res) => {
       return sendTokenResponse(user, 200, req, res);
     }
 
-  
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
@@ -310,7 +367,13 @@ exports.login = async (req, res) => {
       return res.redirect("/login?error=" + encodeURIComponent(msg));
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(rawPassword, user.password || "");
+    } catch (bcryptErr) {
+      console.error("Bcrypt compare error:", bcryptErr);
+      isMatch = false;
+    }
 
     if (!isMatch) {
       const msg = "Invalid password.";
@@ -319,7 +382,13 @@ exports.login = async (req, res) => {
       return res.redirect("/login?error=" + encodeURIComponent(msg));
     }
 
-   
+    if (user.accountStatus === "Discontinued") {
+      const msg = "Your account has been discontinued. Please contact support if you believe this is an error.";
+      await logUserActivity({ userId: user._id, userEmail: user.email, action: `Failed login attempt (discontinued account)`, ipAddress: req.ip, severity: "warning", category: "auth" });
+      if (isJsonRequest) return res.status(403).json({ success: false, message: msg });
+      return res.redirect("/login?error=" + encodeURIComponent(msg));
+    }
+
     if (user.role !== selectedRole) {
       const msg = `This account is registered as ${user.role}.`;
       await logUserActivity({ userId: user._id, userEmail: user.email, action: `Failed login attempt (role mismatch: attempted ${selectedRole}, actual ${user.role})`, ipAddress: req.ip, severity: "warning", category: "auth" });
@@ -327,7 +396,6 @@ exports.login = async (req, res) => {
       return res.redirect("/login?error=" + encodeURIComponent(msg));
     }
 
-    
     if (!user.isVerified) {
       const msg = "Please verify your email address before logging in.";
       await logUserActivity({ userId: user._id, userEmail: user.email, action: `Failed login attempt (unverified email)`, ipAddress: req.ip, severity: "warning", category: "auth" });
@@ -348,8 +416,9 @@ exports.login = async (req, res) => {
 
   } catch (error) {
     console.error("Login Error:", error);
-    if (isJsonRequest) return res.status(500).json({ success: false, message: "Server Error" });
-    return res.redirect("/login?error=" + encodeURIComponent("Server Error"));
+    const msg = "Login failed due to a server error. Please try again.";
+    if (isJsonRequest) return res.status(500).json({ success: false, message: msg });
+    return res.redirect("/login?error=" + encodeURIComponent(msg));
   }
 };
 

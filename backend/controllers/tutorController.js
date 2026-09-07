@@ -565,73 +565,238 @@ exports.getAllTutors = async (req, res) => {
       lat,
       lng,
       distanceRadius,
+      radius,
     } = req.query;
 
     let filter = {};
 
     if (available === "true") filter.available = true;
-    if (subject && subject !== "all") filter.subjects = { $regex: subject, $options: "i" };
-    if (location && location !== "all") filter.location = { $regex: location, $options: "i" };
-    if (mode && mode !== "all") filter.mode = { $regex: mode, $options: "i" };
+
+    // 1. Subject filter with synonym expansion
+    if (subject && subject !== "all") {
+      const subClean = subject.trim();
+      let pattern = subClean;
+      if (/^math/i.test(subClean)) {
+        pattern = "Math|Mathematics|Algebra|Calculus|Geometry|Trigonometry";
+      } else if (/^coding$/i.test(subClean) || /^computer/i.test(subClean) || /^programming/i.test(subClean)) {
+        pattern = "Coding|Computer|Programming|Python|Java|C\\+\\+|JavaScript|Web|IT|Tech";
+      } else if (/^languages?$/i.test(subClean)) {
+        pattern = "Language|English|Hindi|French|German|Spanish|Sanskrit|Punjabi|Tamil|Telugu|Kannada";
+      } else if (/^physics$/i.test(subClean)) {
+        pattern = "Physics|Science";
+      } else if (/^chemistry$/i.test(subClean)) {
+        pattern = "Chemistry|Science";
+      } else if (/^biology$/i.test(subClean)) {
+        pattern = "Biology|Science|Zoology|Botany";
+      } else if (/^science$/i.test(subClean)) {
+        pattern = "Science|Physics|Chemistry|Biology|PCB|PCM";
+      }
+      filter.subjects = { $regex: pattern, $options: "i" };
+    }
+
+    const isGpsActive =
+      lat !== undefined &&
+      lng !== undefined &&
+      lat !== null &&
+      lng !== null &&
+      String(lat).trim() !== "" &&
+      String(lng).trim() !== "";
+
+    // 2. Location filter searching across multiple location fields (applied ONLY when GPS coordinates are NOT passed)
+    if (!isGpsActive && location && location !== "all") {
+      const locClean = location.trim();
+      if (locClean.toLowerCase() === "online") {
+        filter.$or = [
+          { location: { $regex: "online", $options: "i" } },
+          { mode: { $regex: "online", $options: "i" } },
+        ];
+      } else {
+        const locPattern = locClean.toLowerCase().includes("delhi")
+          ? "Delhi"
+          : locClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const locRegex = { $regex: locPattern, $options: "i" };
+        filter.$or = [
+          { location: locRegex },
+          { city: locRegex },
+          { state: locRegex },
+          { currentAddress: locRegex },
+          { teachingArea: locRegex },
+          { preferredLocation: locRegex },
+          { serviceAreas: locRegex },
+        ];
+      }
+    }
+
+    // 3. Mode filter matching variations
+    if (mode && mode !== "all") {
+      if (mode === "Home" || mode === "Offline") {
+        filter.mode = { $regex: "Home|Offline|Both", $options: "i" };
+      } else if (mode === "Online") {
+        filter.mode = { $regex: "Online|Both", $options: "i" };
+      } else if (mode === "Both") {
+        filter.mode = { $regex: "Both|Online|Offline|Home", $options: "i" };
+      } else {
+        filter.mode = { $regex: mode, $options: "i" };
+      }
+    }
+
+    // 4. Grade / Class filter matching numeric and text standards
     if (grade && grade !== "all") {
       if (grade === "Class 1-5" || grade === "Grade 1-5") {
-        filter.classes = { $regex: "(Class\\s*[1-5]\\b|Grade\\s*[1-5]\\b|Class 1-5|Grade 1-5|Primary|All Grades|Class 1 to 12)", $options: "i" };
+        filter.classes = { $regex: "(Class\\s*[1-5]\\b|Grade\\s*[1-5]\\b|\\b[1-5](st|nd|rd|th)?\\b|Primary|All Grades|Class 1 to 12)", $options: "i" };
       } else if (grade === "Class 6-8" || grade === "Grade 6-8") {
-        filter.classes = { $regex: "(Class\\s*[6-8]\\b|Grade\\s*[6-8]\\b|Class 6-8|Grade 6-8|Middle|All Grades|Class 1 to 12)", $options: "i" };
+        filter.classes = { $regex: "(Class\\s*[6-8]\\b|Grade\\s*[6-8]\\b|\\b[6-8](th)?\\b|Middle|All Grades|Class 1 to 12)", $options: "i" };
       } else if (grade === "Class 9-10" || grade === "Grade 9-10") {
-        filter.classes = { $regex: "(Class\\s*(9|10)\\b|Grade\\s*(9|10)\\b|Class 9-10|Grade 9-10|Secondary|All Grades|Class 1 to 12)", $options: "i" };
+        filter.classes = { $regex: "(Class\\s*(9|10)\\b|Grade\\s*(9|10)\\b|\\b(9|10)(th)?\\b|\\bIX\\b|\\bX\\b|Secondary|All Grades|Class 1 to 12)", $options: "i" };
       } else if (grade === "Class 11-12" || grade === "Grade 11-12") {
-        filter.classes = { $regex: "(Class\\s*(11|12)\\b|Grade\\s*(11|12)\\b|Class 11-12|Grade 11-12|Senior|All Grades|Class 1 to 12)", $options: "i" };
+        filter.classes = { $regex: "(Class\\s*(11|12)\\b|Grade\\s*(11|12)\\b|\\b(11|12)(th)?\\b|\\bXI\\b|\\bXII\\b|Senior|All Grades|Class 1 to 12)", $options: "i" };
       } else if (grade.startsWith("Class ")) {
         const num = grade.replace("Class ", "").trim();
-        filter.classes = { $regex: `(Class\\s*${num}\\b|Grade\\s*${num}\\b|All Grades|Class 1 to 12)`, $options: "i" };
+        filter.classes = { $regex: `(Class\\s*${num}\\b|Grade\\s*${num}\\b|\\b${num}(st|nd|rd|th)?\\b|All Grades|Class 1 to 12)`, $options: "i" };
       } else {
         filter.classes = { $regex: grade, $options: "i" };
       }
     }
-    if (board && board !== "all") filter.board = { $regex: board, $options: "i" };
-    if (gender && gender !== "all") filter.gender = { $regex: gender, $options: "i" };
-    if (language && language !== "all") filter.language = { $regex: language, $options: "i" };
-    if (minRating && Number(minRating) > 0) filter.rating = { $gte: Number(minRating) };
 
+    // 5. Board filter
+    if (board && board !== "all") {
+      const cleanBoard = board.replace(/board/i, "").trim();
+      filter.board = { $regex: cleanBoard, $options: "i" };
+    }
+
+    // 6. Gender filter
+    if (gender && gender !== "all") {
+      filter.gender = { $regex: `^${gender}`, $options: "i" };
+    }
+
+    // 7. Language filter
+    if (language && language !== "all") {
+      filter.language = { $regex: language, $options: "i" };
+    }
+
+    // 8. Rating filter
+    if (minRating && Number(minRating) > 0) {
+      filter.rating = { $gte: Number(minRating) };
+    }
+
+    // 9. Fee range filter
     if (minFee || maxFee) {
       filter.fee = {};
       if (minFee) filter.fee.$gte = Number(minFee);
       if (maxFee) filter.fee.$lte = Number(maxFee);
     }
 
+    // 10. Experience range filter
     if (experience && experience !== "all") {
-      if (experience.includes("3-5")) filter.experience = { $gte: 3, $lte: 5 };
-      else if (experience.includes("5-10")) filter.experience = { $gte: 5, $lte: 10 };
-      else if (experience.includes("10+")) filter.experience = { $gte: 10 };
+      if (experience.includes("3-5")) {
+        filter.experience = { $gte: 3, $lte: 5 };
+      } else if (experience.includes("5-10")) {
+        filter.experience = { $gte: 5, $lte: 10 };
+      } else if (experience.includes("10+")) {
+        filter.experience = { $gte: 10 };
+      }
     }
 
-    let tutors = await TutorProfile.find(filter).populate("user", "name email phone");
+    let tutors = await TutorProfile.find(filter).populate("user", "name email phone").lean();
 
-    if (search) {
-      const searchRegex = new RegExp(search, "i");
-      tutors = tutors.filter(
-        (t) =>
-          (t.user && searchRegex.test(t.user.name)) ||
-          searchRegex.test(t.qualification) ||
-          t.subjects.some((s) => searchRegex.test(s)) ||
-          searchRegex.test(t.location)
-      );
+    // 11. Keyword / Name Search filter (safe regex search)
+    if (search && search.trim()) {
+      const safeSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(safeSearch, "i");
+      tutors = tutors.filter((t) => {
+        const userNameMatch = t.user && t.user.name && searchRegex.test(t.user.name);
+        const nameMatch = userNameMatch ||
+                          (t.fullName && searchRegex.test(t.fullName)) ||
+                          (t.firstName && searchRegex.test(t.firstName)) ||
+                          (t.lastName && searchRegex.test(t.lastName));
+        const qualMatch = t.qualification && searchRegex.test(t.qualification);
+        const aboutMatch = t.about && searchRegex.test(t.about);
+        const locMatch = (t.location && searchRegex.test(t.location)) ||
+                         (t.city && searchRegex.test(t.city)) ||
+                         (t.state && searchRegex.test(t.state)) ||
+                         (t.currentAddress && searchRegex.test(t.currentAddress));
+        const subjMatch = Array.isArray(t.subjects) && t.subjects.some((s) => typeof s === "string" && searchRegex.test(s));
+        const classMatch = Array.isArray(t.classes) && t.classes.some((c) => typeof c === "string" && searchRegex.test(c));
+        const boardMatch = Array.isArray(t.board) && t.board.some((b) => typeof b === "string" && searchRegex.test(b));
+        const specMatch = (typeof t.specialization === "string" && searchRegex.test(t.specialization)) ||
+                          (Array.isArray(t.specialization) && t.specialization.some((sp) => typeof sp === "string" && searchRegex.test(sp)));
+        return nameMatch || qualMatch || aboutMatch || locMatch || subjMatch || classMatch || boardMatch || specMatch;
+      });
     }
-    if (lat && lng) {
+
+    // 12. Geolocation & Distance Calculation
+    if (isGpsActive) {
       const userLat = Number(lat);
       const userLng = Number(lng);
-      const maxDistance = distanceRadius ? Number(distanceRadius.replace("km", "")) : 50;
+      if (!isNaN(userLat) && !isNaN(userLng)) {
+        const effectiveRadius = distanceRadius || radius;
+        const maxDistance =
+          effectiveRadius && effectiveRadius !== "all"
+            ? Number(String(effectiveRadius).replace("km", "").trim()) || 50
+            : 50;
 
-      tutors = tutors
-        .map((t) => {
-          const tutorLat = t.coordinates?.lat || 28.6139;
-          const tutorLng = t.coordinates?.lng || 77.2090;
-          const dist = calculateDistanceKm(userLat, userLng, tutorLat, tutorLng);
-          return { ...t.toObject(), distanceKm: Math.round(dist * 10) / 10 };
-        })
-        .filter((t) => t.distanceKm <= maxDistance)
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+        tutors = tutors
+          .map((t) => {
+            const hasLat = t.coordinates && typeof t.coordinates.lat === "number" && !isNaN(t.coordinates.lat);
+            const hasLng = t.coordinates && typeof t.coordinates.lng === "number" && !isNaN(t.coordinates.lng);
+
+            const tutorLat = hasLat ? t.coordinates.lat : 28.6139;
+            const tutorLng = hasLng ? t.coordinates.lng : 77.2090;
+
+            const isSchemaDefault = tutorLat === 28.6139 && tutorLng === 77.2090;
+            const dist = calculateDistanceKm(userLat, userLng, tutorLat, tutorLng);
+
+            let cityMatches = false;
+            if (location && location !== "all") {
+              const targetLoc = location.trim().toLowerCase();
+              const fieldsToTest = [
+                t.city,
+                t.location,
+                t.state,
+                t.currentAddress,
+                t.teachingArea,
+                t.preferredLocation,
+                ...(Array.isArray(t.serviceAreas) ? t.serviceAreas : []),
+              ];
+              cityMatches = fieldsToTest.some(
+                (field) => typeof field === "string" && field.toLowerCase().includes(targetLoc)
+              );
+            }
+
+            let isWithinRadius = false;
+            let finalDistance = null;
+
+            if (!isSchemaDefault) {
+              // Real custom coordinates exist
+              finalDistance = Math.round(dist * 10) / 10;
+              isWithinRadius = finalDistance <= maxDistance;
+            } else {
+              // Schema default coordinates (28.6139, 77.2090)
+              if (dist <= maxDistance) {
+                // User is in Delhi area where default coordinates match user location
+                finalDistance = Math.round(dist * 10) / 10;
+                isWithinRadius = true;
+              } else if (cityMatches) {
+                // Tutor city matches the target location (e.g. Dehradun) but coords are default placeholder
+                isWithinRadius = true;
+                finalDistance = null;
+              }
+            }
+
+            return {
+              ...t,
+              distanceKm: finalDistance,
+              isWithinRadius,
+            };
+          })
+          .filter((t) => t.isWithinRadius)
+          .sort((a, b) => {
+            if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
+            if (a.distanceKm !== null) return -1;
+            if (b.distanceKm !== null) return 1;
+            return 0;
+          });
+      }
     }
 
     return res.status(200).json({ success: true, count: tutors.length, tutors });

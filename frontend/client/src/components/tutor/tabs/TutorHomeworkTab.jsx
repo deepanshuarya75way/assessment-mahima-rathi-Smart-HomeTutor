@@ -87,7 +87,7 @@ export const TutorHomeworkTab = () => {
       const data = await res.json();
       if (res.ok && data.success) {
         const targetStName = students.find((s) => s._id === selectedStudent)?.name || 'Selected Student';
-        setMessage({ text: `✅ Study Notes uploaded and shared with ${targetStName} successfully!`, type: 'success' });
+        setMessage({ text: `Study Notes uploaded and shared with ${targetStName} successfully!`, type: 'success' });
         setTitle('');
         setSubject('');
         setClassName('');

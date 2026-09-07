@@ -1,4 +1,5 @@
 import React from 'react';
+import { FiStar } from 'react-icons/fi';
 import { AnnouncementsList } from '../../common/AnnouncementsList';
 import { ReferralSection } from '../../common/ReferralSection';
 
@@ -247,7 +248,7 @@ export const TutorOverviewTab = ({
                   <div key={rev._id || idx} style={{ padding: '12px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <strong style={{ fontSize: '13px', color: '#0f2a4a' }}>{rev.studentName || rev.student?.name || 'Student'}</strong>
-                      <span style={{ color: '#f59e0b', fontSize: '12px', fontWeight: 'bold' }}>⭐ {rev.rating || 5}/5</span>
+                      <span style={{ color: '#f59e0b', fontSize: '12px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><FiStar size={12} fill="#f59e0b" /> {rev.rating || 5}/5</span>
                     </div>
                     <p style={{ fontSize: '12px', color: '#475569', margin: 0 }}>"{rev.comment || rev.reviewText || 'Great teacher!'}"</p>
                   </div>

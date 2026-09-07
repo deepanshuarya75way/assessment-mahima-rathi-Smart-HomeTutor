@@ -80,4 +80,9 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for financial lookups & reporting
+paymentSchema.index({ user: 1, paymentStatus: 1 });
+paymentSchema.index({ tutor: 1, paymentStatus: 1 });
+paymentSchema.index({ orderId: 1 });
+
 module.exports = mongoose.model("Payment", paymentSchema);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export const Footer = () => {
   const [email, setEmail] = useState('');
@@ -18,14 +19,14 @@ export const Footer = () => {
       });
       const data = await response.json();
       if (data.success) {
-        setStatusMsg({ type: 'success', text: '✅ ' + data.message });
+        setStatusMsg({ type: 'success', text: data.message });
         setEmail('');
       } else {
-        setStatusMsg({ type: 'error', text: '❌ ' + (data.message || 'Subscription failed.') });
+        setStatusMsg({ type: 'error', text: (data.message || 'Subscription failed.') });
       }
     } catch (err) {
       console.error(err);
-      setStatusMsg({ type: 'error', text: '❌ Subscription error. Please try again.' });
+      setStatusMsg({ type: 'error', text: 'Subscription error. Please try again.' });
     } finally {
       setLoading(false);
       setTimeout(() => setStatusMsg(null), 5000);
@@ -38,13 +39,13 @@ export const Footer = () => {
         {/* Logo + Brand */}
         <div className="footer-box">
           <h2 className="footer-logo">
-            <a href="/" className="brand-logo-link">
+            <Link to="/" className="brand-logo-link">
               <img src="/images/logo.png" alt="Smart HomeTutor Logo" className="site-logo-img" />
               <div className="brand-text-stack">
                 <span className="brand-smart">Smart</span>
                 <span className="brand-hometutor" style={{ color: '#ffffff' }}>HomeTutor</span>
               </div>
-            </a>
+            </Link>
           </h2>
           <p>
             Connecting expert tutors with students to build a brighter academic future through personalized, safe, and effective learning.
@@ -69,10 +70,11 @@ export const Footer = () => {
         <div className="footer-box">
           <h3>Company</h3>
           <ul>
-            <li><a href="/about">About Us</a></li>
-            <li><a href="/contact">Contact</a></li>
-            <li><a href="/privacy-policy">Privacy Policy</a></li>
-            <li><a href="/terms-of-service">Terms of Service</a></li>
+            <li><Link to="/about">About Us</Link></li>
+            <li><Link to="/blogs">Blogs</Link></li>
+            <li><Link to="/contact">Contact</Link></li>
+            <li><Link to="/privacy-policy">Privacy Policy</Link></li>
+            <li><Link to="/terms-of-service">Terms of Service</Link></li>
           </ul>
         </div>
 
@@ -80,10 +82,10 @@ export const Footer = () => {
         <div className="footer-box">
           <h3>Subjects</h3>
           <ul>
-            <li><a href="/subjects/mathematics">Mathematics</a></li>
-            <li><a href="/subjects/science">Science</a></li>
-            <li><a href="/subjects/languages">Languages</a></li>
-            <li><a href="/subjects/test-prep">Test Prep</a></li>
+            <li><Link to="/subjects/mathematics">Mathematics</Link></li>
+            <li><Link to="/subjects/science">Science</Link></li>
+            <li><Link to="/subjects/languages">Languages</Link></li>
+            <li><Link to="/subjects/test-prep">Test Prep</Link></li>
           </ul>
         </div>
 

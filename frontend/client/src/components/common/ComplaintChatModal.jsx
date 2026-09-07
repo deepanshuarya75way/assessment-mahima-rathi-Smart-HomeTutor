@@ -330,7 +330,7 @@ export const ComplaintChatModal = ({ complaint, isOpen, onClose, currentUserRole
                 <option value="Closed">Closed</option>
                 <option value="Rejected">Rejected</option>
               </select>
-              {statusMsg && <span style={{ color: '#166534', fontSize: '12px', fontWeight: '700' }}>✓ {statusMsg}</span>}
+              {statusMsg && <span style={{ color: '#166534', fontSize: '12px', fontWeight: '700' }}>{statusMsg}</span>}
             </div>
 
             {status !== 'Resolved' && (
@@ -408,7 +408,7 @@ export const ComplaintChatModal = ({ complaint, isOpen, onClose, currentUserRole
                   }}
                 >
                   <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', fontWeight: '600' }}>
-                    {isAdminMsg ? '🛡️ Support Admin' : `👤 ${msg.sender?.name || 'User'}`} •{' '}
+                    {isAdminMsg ? 'Support Admin' : `${msg.sender?.name || 'User'}`} •{' '}
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
 

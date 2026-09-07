@@ -41,7 +41,7 @@ export const SocketCallListener = () => {
     };
 
     const handleIncomingCall = (data) => {
-      console.log('📞 [SocketCallListener] Incoming video call received:', data);
+      console.log('[SocketCallListener] Incoming video call received:', data);
       if (!data) return;
       setCallStatusMsg('');
       setIncomingCall({
@@ -195,7 +195,7 @@ export const SocketCallListener = () => {
             <i className="fa-solid fa-video fa-beat"></i>
           </div>
           <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>
-            📹 Incoming Video Call
+            Incoming Video Call
           </h3>
           <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '16px', lineHeight: 1.5 }}>
             <strong style={{ color: '#38bdf8' }}>{incomingCall.callerName || 'Tutor'}</strong> ({incomingCall.callerRole || 'Tutor'}) is calling you for{' '}

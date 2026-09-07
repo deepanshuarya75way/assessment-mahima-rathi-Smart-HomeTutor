@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export const FeaturedTutors = () => {
   const tutors = [
@@ -63,9 +64,9 @@ export const FeaturedTutors = () => {
                     <span className="price-val">{tutor.price}</span>
                     <span className="price-unit">/hr</span>
                   </div>
-                  <a href="/find" className="read-more-link">
+                  <Link to="/find" className="read-more-link">
                     Book Trial <i className="fa-solid fa-chevron-right"></i>
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>

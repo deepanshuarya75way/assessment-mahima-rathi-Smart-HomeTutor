@@ -68,31 +68,45 @@ const checkAndSendFeeReminders = async (app, customNowDate = null) => {
       const baselineDate = await getStudentFeeBaselineDate(student._id, student.createdAt);
       const diffMs = now.getTime() - baselineDate.getTime();
 
-      if (diffMs < FEE_CYCLE_MS) {
-        // Fee cycle is still active/paid for this period
+      const UPCOMING_THRESHOLD_MS = 27 * MS_PER_DAY; // 3 days before 30-day due date
+      if (diffMs < UPCOMING_THRESHOLD_MS) {
+        // Fee cycle is still active and not yet approaching due date
         continue;
       }
 
       // Determine cycle window for current due cycle
-      const cyclesElapsed = Math.floor(diffMs / FEE_CYCLE_MS);
-      const cycleStartDate = new Date(baselineDate.getTime() + cyclesElapsed * FEE_CYCLE_MS);
+      const cyclesElapsed = Math.max(1, Math.floor(diffMs / FEE_CYCLE_MS));
+      const cycleStartDate = new Date(baselineDate.getTime() + (cyclesElapsed - 1) * FEE_CYCLE_MS);
 
-      // ----------------------------------------------------
-      // 1. STUDENT FEE REMINDER NOTIFICATION
-      // ----------------------------------------------------
+      let reminderTitle = "Monthly Fee Due 💳";
+      let reminderMessage = "Your monthly tuition fee is due today. Please complete your payment.";
+
+      if (diffMs >= 33 * MS_PER_DAY) {
+        // Overdue Fee Reminder (3+ days past due date)
+        reminderTitle = "Overdue Fee Reminder ⚠️";
+        reminderMessage = "Your monthly tuition fee is overdue. Please complete your payment immediately to avoid service interruption.";
+      } else if (diffMs >= 27 * MS_PER_DAY && diffMs < 30 * MS_PER_DAY) {
+        // Upcoming Fee Reminder (3 days before due date)
+        reminderTitle = "Upcoming Fee Reminder 💳";
+        reminderMessage = "Your monthly tuition fee will be due in 3 days. Please prepare your payment.";
+      }
+
+      // Duplicate check for this student and stage in current cycle
       const studentDuplicate = await Notification.findOne({
         user: student._id,
         type: "fee",
-        title: "Monthly Fee Reminder",
+        title: reminderTitle,
         createdAt: { $gte: cycleStartDate },
       });
 
       if (!studentDuplicate) {
+        // Calling createNotification for student automatically mirrors the fee notification
+        // to linked parent(s) via ChildProfile with duplicate prevention and Socket.IO emission
         const studentNotif = await createNotification({
           userId: student._id,
           role: "student",
-          title: "Monthly Fee Reminder",
-          message: "Your monthly tuition fee is due. Please complete your payment.",
+          title: reminderTitle,
+          message: reminderMessage,
           type: "fee",
           actionUrl: "/dashboard/student?tab=payments",
           app,
@@ -100,52 +114,6 @@ const checkAndSendFeeReminders = async (app, customNowDate = null) => {
 
         if (studentNotif) {
           notificationsSent++;
-        }
-      }
-
-      // ----------------------------------------------------
-      // 2. PARENT FEE REMINDER NOTIFICATION
-      // ----------------------------------------------------
-      // Find linked parent(s) via ChildProfile relationship
-      const cleanStudentEmail = student.email ? student.email.toLowerCase().trim() : "";
-      const childLinks = await ChildProfile.find({
-        $or: [
-          { student: student._id },
-          ...(cleanStudentEmail ? [{ email: cleanStudentEmail }] : []),
-        ],
-      }).select("parent");
-
-      if (childLinks && childLinks.length > 0) {
-        const studentName = student.name || "Student";
-        const parentMessage = `The monthly tuition fee for ${studentName} is due. Please complete the payment.`;
-
-        for (const link of childLinks) {
-          if (!link.parent) continue;
-
-          // Check for duplicate parent notification for this student in current cycle
-          const parentDuplicate = await Notification.findOne({
-            user: link.parent,
-            type: "fee",
-            title: "Monthly Fee Reminder",
-            message: { $regex: studentName, $options: "i" },
-            createdAt: { $gte: cycleStartDate },
-          });
-
-          if (!parentDuplicate) {
-            const parentNotif = await createNotification({
-              userId: link.parent,
-              role: "parent",
-              title: "Monthly Fee Reminder",
-              message: parentMessage,
-              type: "fee",
-              actionUrl: "/dashboard/parent?tab=payments",
-              app,
-            });
-
-            if (parentNotif) {
-              notificationsSent++;
-            }
-          }
         }
       }
     }

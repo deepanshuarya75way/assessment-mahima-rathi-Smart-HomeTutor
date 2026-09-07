@@ -20,6 +20,7 @@ export const StudentSidebar = ({ activeTab, onSelectTab, studentUser, onOpenCert
     { key: 'chat', label: 'Messages', icon: 'fa-comments' },
     { key: 'payments', label: 'Smart Wallet & Billing', icon: 'fa-wallet' },
     { key: 'complaints', label: 'Help Desk & Complaints', icon: 'fa-circle-exclamation' },
+    { key: 'settings', label: 'Settings', icon: 'fa-gear' },
   ];
 
   return (

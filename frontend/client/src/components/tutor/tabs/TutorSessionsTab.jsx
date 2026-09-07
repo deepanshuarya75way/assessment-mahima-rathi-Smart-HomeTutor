@@ -84,7 +84,8 @@ export const TutorSessionsTab = ({ sessions = [], onRefresh }) => {
                 </tr>
               ) : (
                 sessions.map((item, idx) => {
-                  const isOnline = !item.mode || item.mode.toLowerCase() === 'online';
+                  const isInactiveStatus = ['Completed', 'Cancelled', 'Discontinued', 'Missed', 'Rejected'].includes(item.status);
+                  const isOnline = (!item.mode || item.mode.toLowerCase() === 'online') && !isInactiveStatus;
                   const attStatus = item.attendance || 'Pending';
                   let attBadgeColor = '#64748b';
                   let attBadgeBg = '#f1f5f9';

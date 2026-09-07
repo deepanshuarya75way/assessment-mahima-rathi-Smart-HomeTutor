@@ -253,7 +253,7 @@ export const TutorApplicationDetailModal = ({ application, onClose, onApprove, o
               <div><strong style={{ color: '#475569' }}>Account Number:</strong> <div style={{ color: '#0f172a', fontWeight: '600' }}>{application.paymentDetails?.accountNumber || 'N/A'}</div></div>
               <div><strong style={{ color: '#475569' }}>IFSC Code:</strong> <div style={{ color: '#0f172a', fontWeight: '600' }}>{application.paymentDetails?.ifscCode || 'N/A'}</div></div>
               <div><strong style={{ color: '#475569' }}>UPI ID:</strong> <div style={{ color: '#0f172a', fontWeight: '600' }}>{application.paymentDetails?.upiId || 'N/A'}</div></div>
-              <div><strong style={{ color: '#475569' }}>Declaration Accepted:</strong> <div style={{ color: application.declarationAccepted ? '#166534' : '#991b1b', fontWeight: '700' }}>{application.declarationAccepted ? '✓ Yes' : '✗ No'}</div></div>
+              <div><strong style={{ color: '#475569' }}>Declaration Accepted:</strong> <div style={{ color: application.declarationAccepted ? '#166534' : '#991b1b', fontWeight: '700' }}>{application.declarationAccepted ? 'Yes' : 'No'}</div></div>
             </div>
           </div>
 

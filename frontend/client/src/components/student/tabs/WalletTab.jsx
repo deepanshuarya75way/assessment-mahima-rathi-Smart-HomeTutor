@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { studentApi } from '../../../services/studentApi';
 import { loadRazorpaySdk } from '../../../utils/razorpayLoader';
+import { ReferralSection } from '../../common/ReferralSection';
 
 export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupSuccess, onOpenTopup }) => {
   const [promoCode, setPromoCode] = useState('');
@@ -24,6 +25,16 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
+  // Referral State
+  const [referralData, setReferralData] = useState({
+    referralCode: '',
+    referralEarnings: 0,
+    totalReferrals: 0,
+    studentReferrals: 0,
+    tutorReferrals: 0,
+    referrals: [],
+  });
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -37,9 +48,10 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
   const fetchInitialData = async () => {
     setLoadingHistory(true);
     try {
-      const [tutorsRes, historyRes] = await Promise.all([
+      const [tutorsRes, historyRes, refRes] = await Promise.all([
         studentApi.getMyTutors(),
         studentApi.getPaymentHistory(),
+        studentApi.getReferrals(),
       ]);
 
       if (tutorsRes.success && Array.isArray(tutorsRes.tutors)) {
@@ -53,6 +65,17 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
 
       if (historyRes.success && Array.isArray(historyRes.payments)) {
         setPaymentHistory(historyRes.payments);
+      }
+
+      if (refRes && refRes.success) {
+        setReferralData({
+          referralCode: refRes.referralCode || '',
+          referralEarnings: refRes.totalEarnings || refRes.referralEarnings || 0,
+          totalReferrals: refRes.totalReferrals || 0,
+          studentReferrals: refRes.studentReferrals || 0,
+          tutorReferrals: refRes.tutorReferrals || 0,
+          referrals: refRes.referrals || refRes.referredUsers || [],
+        });
       }
     } catch (err) {
       console.error('Fetch Payment Data Error:', err);
@@ -126,10 +149,10 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
   const handleApplyPromo = () => {
     if (!promoCode.trim()) return;
     if (promoCode.trim().toUpperCase() === 'WELCOME10') {
-      setPromoMsg('✅ Promo WELCOME10 is valid for 10% discount on regular class bookings!');
+      setPromoMsg('Promo WELCOME10 is valid for 10% discount on regular class bookings!');
       setPromoCode('');
     } else {
-      setPromoMsg('❌ Invalid or expired promo code.');
+      setPromoMsg('Invalid or expired promo code.');
     }
   };
 
@@ -175,7 +198,7 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
         });
 
         if (walletRes && walletRes.success) {
-          setPayState({ status: 'success', message: `✅ ₹${payAmt} Tuition Fee Paid Successfully from Smart Wallet!` });
+          setPayState({ status: 'success', message: `₹${payAmt} Tuition Fee Paid Successfully from Smart Wallet!` });
           if (onWalletTopupSuccess) {
             onWalletTopupSuccess(walletRes.walletBalance, walletRes.message);
           }
@@ -231,7 +254,7 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
             });
 
             if (verifyRes.success) {
-              setPayState({ status: 'success', message: '✅ Payment Verified & Tuition Fee Paid Successfully!' });
+              setPayState({ status: 'success', message: 'Payment Verified & Tuition Fee Paid Successfully!' });
               if (verifyRes.walletBalance !== undefined && onWalletTopupSuccess) {
                 onWalletTopupSuccess(verifyRes.walletBalance, 'Payment verified!');
               }
@@ -287,7 +310,7 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
         });
 
         if (verifyRes.success) {
-          setPayState({ status: 'success', message: '✅ Payment Verified & Tuition Fee Paid Successfully!' });
+          setPayState({ status: 'success', message: 'Payment Verified & Tuition Fee Paid Successfully!' });
           if (verifyRes.walletBalance !== undefined && onWalletTopupSuccess) {
             onWalletTopupSuccess(verifyRes.walletBalance, 'Payment verified!');
           }
@@ -632,6 +655,17 @@ export const WalletTab = ({ walletBalance = 0, transactions = [], onWalletTopupS
             </table>
           </div>
         </div>
+      </div>
+
+      {/* REFERRAL HISTORY & PROGRAM SECTION */}
+      <div style={{ marginTop: '24px' }}>
+        <ReferralSection
+          referralCode={referralData.referralCode}
+          referralEarnings={referralData.referralEarnings}
+          referredCount={referralData.totalReferrals}
+          referredUsers={referralData.referrals}
+          userRole="student"
+        />
       </div>
     </div>
   );

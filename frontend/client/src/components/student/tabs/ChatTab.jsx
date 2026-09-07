@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FiPaperclip, FiX } from 'react-icons/fi';
 
 export const ChatTab = ({ studentUser, onStartVideoCall }) => {
   const [conversations, setConversations] = useState([]);
@@ -330,7 +331,7 @@ export const ChatTab = ({ studentUser, onStartVideoCall }) => {
                     </span>
                   ) : (
                     <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                      <i className="fa-solid fa-comments"></i> 💬 Chat Unlocked
+                      <i className="fa-solid fa-comments"></i> Chat Unlocked
                     </span>
                   )
                 )}
@@ -419,20 +420,20 @@ export const ChatTab = ({ studentUser, onStartVideoCall }) => {
             {/* PENDING FILE PREVIEW */}
             {pendingFile && !isChatLocked && (
               <div style={{ padding: '8px 16px', background: '#e0f2fe', borderTop: '1px solid #bae6fd', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#0369a1' }}>
-                <span>📎 Ready to send: <strong>{pendingFile.fileName}</strong></span>
-                <button type="button" onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕ Cancel</button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiPaperclip /> Ready to send: <strong>{pendingFile.fileName}</strong></span>
+                <button type="button" onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiX /> Cancel</button>
               </div>
             )}
 
             <div className="chat-footer">
               <label className="dash-btn dash-btn-outline" style={{ padding: '10px 14px', cursor: isChatLocked ? 'not-allowed' : 'pointer', opacity: isChatLocked ? 0.5 : 1, display: 'inline-flex', alignItems: 'center' }} title={isChatLocked ? 'Chat Locked' : 'Attach File'}>
-                <i className="fa-solid fa-paperclip" style={{ fontSize: '16px' }}></i>
+                <FiPaperclip style={{ fontSize: '16px' }} />
                 <input type="file" accept="image/*,.pdf,.doc,.docx" style={{ display: 'none' }} disabled={isChatLocked} onChange={handleFileUpload} />
               </label>
 
               <input
                 type="text"
-                placeholder={isChatLocked ? '🔒 Chat will be available after the tutor completes the payment.' : (uploadingFile ? 'Uploading file...' : 'Type message...')}
+                placeholder={isChatLocked ? 'Chat will be available after the tutor completes the payment.' : (uploadingFile ? 'Uploading file...' : 'Type message...')}
                 value={inputMessage}
                 disabled={isChatLocked}
                 onChange={(e) => setInputMessage(e.target.value)}

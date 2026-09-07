@@ -10,6 +10,7 @@ import { ClassesTab } from '../../components/student/tabs/ClassesTab';
 import { HomeworkTab } from '../../components/student/tabs/HomeworkTab';
 import { ChatTab } from '../../components/student/tabs/ChatTab';
 import { WalletTab } from '../../components/student/tabs/WalletTab';
+import { SettingsTab } from '../../components/student/tabs/SettingsTab';
 import { UserComplaintsTab } from '../../components/common/UserComplaintsTab';
 import { BookDemoModal } from '../../components/student/modals/BookDemoModal';
 import { ReviewModal } from '../../components/student/modals/ReviewModal';
@@ -20,6 +21,7 @@ import { RegularClassPaymentModal } from '../../components/tutor/RegularClassPay
 import { TopupWalletModal } from '../../components/student/modals/TopupWalletModal';
 
 import { NotificationsTab } from '../../components/common/NotificationsTab';
+import { ReferralSection } from '../../components/common/ReferralSection';
 import { useDashboardTab } from '../../hooks/useDashboardTab';
 
 const STUDENT_VALID_TABS = [
@@ -32,6 +34,7 @@ const STUDENT_VALID_TABS = [
   'chat',
   'payments',
   'complaints',
+  'settings',
 ];
 
 export const StudentDashboardPage = () => {
@@ -80,31 +83,37 @@ export const StudentDashboardPage = () => {
     }
   };
 
+  const [referredUsers, setReferredUsers] = useState([]);
+
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [profileRes, statsRes, tutorsRes, demoRes, pendingRes] = await Promise.all([
+      const [profileRes, statsRes, tutorsRes, demoRes, pendingRes, refRes] = await Promise.all([
         studentApi.getProfile(),
         studentApi.getDashboardStats(),
         studentApi.getTutors(),
         studentApi.getCompletedDemoTutors(),
         studentApi.getPendingDemoTutors(),
+        studentApi.getReferrals().catch(() => null),
       ]);
 
-      if (profileRes.success && profileRes.student) {
+      if (profileRes && profileRes.success && profileRes.student) {
         setStudentUser(profileRes.student);
       }
-      if (statsRes.success) {
+      if (statsRes && statsRes.success) {
         setStatsData(statsRes);
       }
-      if (tutorsRes.success && tutorsRes.tutors) {
+      if (tutorsRes && tutorsRes.success && tutorsRes.tutors) {
         setTutors(tutorsRes.tutors);
       }
-      if (demoRes.success && demoRes.completedDemoTutorIds) {
+      if (demoRes && demoRes.success && demoRes.completedDemoTutorIds) {
         setCompletedDemoTutorIds(demoRes.completedDemoTutorIds);
       }
-      if (pendingRes.success && pendingRes.pendingDemoTutorIds) {
+      if (pendingRes && pendingRes.success && pendingRes.pendingDemoTutorIds) {
         setPendingDemoTutorIds(pendingRes.pendingDemoTutorIds);
+      }
+      if (refRes && refRes.success && (refRes.referrals || refRes.referredUsers)) {
+        setReferredUsers(refRes.referrals || refRes.referredUsers || []);
       }
       fetchUnreadCount();
     } catch (err) {
@@ -115,6 +124,23 @@ export const StudentDashboardPage = () => {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const messageParam = params.get('message');
+    if (errorParam || messageParam) {
+      const msg = errorParam || messageParam;
+      if (window.showCustomAlert) {
+        window.showCustomAlert(msg, errorParam ? 'Access Denied' : 'Notification', errorParam ? 'error' : 'info');
+      } else {
+        showToast(msg);
+      }
+      params.delete('error');
+      params.delete('message');
+      const newSearch = params.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     loadAllData();
 
     const handleCustomEvent = (e) => {
@@ -229,10 +255,23 @@ export const StudentDashboardPage = () => {
                 referralCode={statsData ? statsData.referralCode : ''}
                 referralEarnings={statsData ? statsData.referralEarnings : 0}
                 referredCount={statsData ? (statsData.referredCount || (statsData.stats ? statsData.stats.referredCount : 0)) : 0}
+                referredUsers={referredUsers}
                 onOpenAIRecommendations={() => setAiModalOpen(true)}
                 onOpenReviewModal={() => setReviewModalOpen(true)}
                 onStartVideoCall={handleStartVideoCall}
               />
+            )}
+
+            {activeTab === 'referral' && (
+              <div className="dash-tab-content" style={{ display: 'block', maxWidth: '900px', margin: '0 auto' }}>
+                <ReferralSection
+                  referralCode={statsData ? statsData.referralCode : ''}
+                  referralEarnings={statsData ? statsData.referralEarnings : 0}
+                  referredCount={statsData ? (statsData.referredCount || (statsData.stats ? statsData.stats.referredCount : 0)) : 0}
+                  referredUsers={referredUsers}
+                  userRole="student"
+                />
+              </div>
             )}
 
             {activeTab === 'my-tutors' && (
@@ -268,6 +307,16 @@ export const StudentDashboardPage = () => {
 
             {activeTab === 'complaints' && (
               <UserComplaintsTab roleName="Student" />
+            )}
+
+            {activeTab === 'settings' && (
+              <SettingsTab
+                studentData={studentUser}
+                onProfileUpdated={(updatedStudent) => {
+                  if (updatedStudent) setStudentUser(updatedStudent);
+                  loadAllData();
+                }}
+              />
             )}
           </>
         )}

@@ -337,13 +337,17 @@ const tutorProfileSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for tutor lookups and admin directory filtering
+tutorProfileSchema.index({ user: 1 });
+tutorProfileSchema.index({ isApproved: 1, isRejected: 1 });
+
 const TutorProfile = mongoose.model("TutorProfile", tutorProfileSchema);
 
 // Drop legacy unique user_1 index if present to allow unauthenticated & multiple applications
 TutorProfile.cleanIndexes = async () => {
   try {
     const indexes = await TutorProfile.collection.indexes();
-    if (indexes.some((idx) => idx.name === "user_1")) {
+    if (indexes.some((idx) => idx.name === "user_1" && idx.unique)) {
       await TutorProfile.collection.dropIndex("user_1");
     }
   } catch (e) {}

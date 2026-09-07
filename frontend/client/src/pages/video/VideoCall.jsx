@@ -123,7 +123,7 @@ export const VideoCall = () => {
   // Acquire Local Camera & Microphone
   const initLocalMedia = async () => {
     try {
-      console.log('🎥 [WebRTC] Requesting local media devices (Camera + Microphone)...');
+      console.log('[WebRTC] Requesting local media devices (Camera + Microphone)...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -133,10 +133,10 @@ export const VideoCall = () => {
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
-      console.log('✅ [WebRTC] Local media stream initialized successfully.');
+      console.log('[WebRTC] Local media stream initialized successfully.');
       return true;
     } catch (err) {
-      console.error('❌ [WebRTC] Media Device Error:', err);
+      console.error('[WebRTC] Media Device Error:', err);
       let msg = 'Could not access your camera or microphone. Please check browser permissions and allow device access.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         msg = 'Microphone and Camera permission was denied. Please allow device permissions in browser settings.';
@@ -152,7 +152,7 @@ export const VideoCall = () => {
   const initSocketSignaling = () => {
     if (!sessionData) return;
 
-    console.log('⚡ [Signaling] Connecting to Socket.IO signaling server...');
+    console.log('[Signaling] Connecting to Socket.IO signaling server...');
     const ioFunc = window.io || (typeof io !== 'undefined' ? io : null);
     if (!ioFunc) {
       showError('Socket Error', 'Socket.IO client script not available.');
@@ -164,7 +164,7 @@ export const VideoCall = () => {
     const { bookingId: bId, user, peerUser } = sessionData;
 
     socket.on('connect', () => {
-      console.log(`✅ [Signaling] Socket connected with ID: ${socket.id}`);
+      console.log(`[Signaling] Socket connected with ID: ${socket.id}`);
       updateStatus('connecting', 'Joining call room...');
 
       socket.emit('join-video-room', {
@@ -176,7 +176,7 @@ export const VideoCall = () => {
     });
 
     socket.on('room-joined', ({ peerCount }) => {
-      console.log(`🏠 [Signaling] Room joined. Total peers in room: ${peerCount}`);
+      console.log(`[Signaling] Room joined. Total peers in room: ${peerCount}`);
       createPeerConnection();
 
       if (peerCount === 1) {
@@ -187,7 +187,7 @@ export const VideoCall = () => {
     });
 
     socket.on('peer-joined', async ({ userName: newPeerName }) => {
-      console.log(`👤 [Signaling] Peer joined room: ${newPeerName}`);
+      console.log(`[Signaling] Peer joined room: ${newPeerName}`);
       updateStatus('connecting', 'Peer connected. Initializing handshake...');
 
       createPeerConnection();
@@ -195,22 +195,22 @@ export const VideoCall = () => {
     });
 
     socket.on('webrtc-offer', async ({ offer }) => {
-      console.log('📥 [Signaling] Received WebRTC SDP OFFER from peer.');
+      console.log('[Signaling] Received WebRTC SDP OFFER from peer.');
       await handleOffer(offer);
     });
 
     socket.on('webrtc-answer', async ({ answer }) => {
-      console.log('📥 [Signaling] Received WebRTC SDP ANSWER from peer.');
+      console.log('[Signaling] Received WebRTC SDP ANSWER from peer.');
       await handleAnswer(answer);
     });
 
     socket.on('webrtc-ice-candidate', async ({ candidate }) => {
-      console.log('🧊 [Signaling] Received ICE Candidate from peer.');
+      console.log('[Signaling] Received ICE Candidate from peer.');
       await handleIceCandidate(candidate);
     });
 
     socket.on('peer-media-state-changed', ({ type, enabled }) => {
-      console.log(`🔊 [Signaling] Peer changed ${type} state to: ${enabled}`);
+      console.log(`[Signaling] Peer changed ${type} state to: ${enabled}`);
       if (type === 'video') {
         setIsPeerVideoOff(!enabled);
       } else if (type === 'audio') {
@@ -219,12 +219,12 @@ export const VideoCall = () => {
     });
 
     socket.on('call-ended', ({ reason }) => {
-      console.log('🛑 [Signaling] Received call-ended event:', reason);
+      console.log('[Signaling] Received call-ended event:', reason);
       teardownCall(reason || 'Call session ended.');
     });
 
     socket.on('peer-disconnected', ({ reason }) => {
-      console.warn('⚠️ [Signaling] Peer disconnected:', reason);
+      console.warn('[Signaling] Peer disconnected:', reason);
       updateStatus('disconnected', `${peerUser.name || 'Participant'} disconnected.`);
       setTimeout(() => {
         teardownCall(`${peerUser.name || 'Participant'} disconnected.`);
@@ -245,7 +245,7 @@ export const VideoCall = () => {
   const createPeerConnection = () => {
     if (peerConnectionRef.current) return;
 
-    console.log('⚙️ [WebRTC] Creating RTCPeerConnection instance...');
+    console.log('[WebRTC] Creating RTCPeerConnection instance...');
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnectionRef.current = pc;
     remoteStreamRef.current = new MediaStream();
@@ -267,7 +267,7 @@ export const VideoCall = () => {
     };
 
     pc.ontrack = (event) => {
-      console.log('📺 [WebRTC] Received remote track:', event.track.kind);
+      console.log('[WebRTC] Received remote track:', event.track.kind);
       if (event.track) {
         remoteStreamRef.current.addTrack(event.track);
       }
@@ -279,7 +279,7 @@ export const VideoCall = () => {
     };
 
     pc.onconnectionstatechange = () => {
-      console.log('🔄 [WebRTC] Connection state changed to:', pc.connectionState);
+      console.log('[WebRTC] Connection state changed to:', pc.connectionState);
       switch (pc.connectionState) {
         case 'connected':
           updateStatus('connected', 'Connected - HD Video Class');
@@ -307,7 +307,7 @@ export const VideoCall = () => {
     try {
       const pc = peerConnectionRef.current;
       if (!pc) return;
-      console.log('🛫 [WebRTC] Creating SDP Offer...');
+      console.log('[WebRTC] Creating SDP Offer...');
       const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
       await pc.setLocalDescription(offer);
 
@@ -331,7 +331,7 @@ export const VideoCall = () => {
       }
       const pc = peerConnectionRef.current;
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      console.log('✅ [WebRTC] Remote description (OFFER) set successfully.');
+      console.log('[WebRTC] Remote description (OFFER) set successfully.');
 
       await processIceCandidateQueue();
 
@@ -356,7 +356,7 @@ export const VideoCall = () => {
       const pc = peerConnectionRef.current;
       if (pc && pc.signalingState !== 'stable') {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        console.log('✅ [WebRTC] Remote description (ANSWER) set successfully.');
+        console.log('[WebRTC] Remote description (ANSWER) set successfully.');
         await processIceCandidateQueue();
       }
     } catch (err) {
@@ -433,7 +433,7 @@ export const VideoCall = () => {
   const handleToggleScreen = async () => {
     try {
       if (!isScreenSharing) {
-        console.log('🖥️ [WebRTC] Requesting Screen Share stream...');
+        console.log('[WebRTC] Requesting Screen Share stream...');
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         screenStreamRef.current = stream;
         const screenTrack = stream.getVideoTracks()[0];
@@ -494,7 +494,7 @@ export const VideoCall = () => {
     if (isCleaningUpRef.current) return;
     isCleaningUpRef.current = true;
 
-    console.log('🛑 [WebRTC] Executing full call teardown...', reason);
+    console.log('[WebRTC] Executing full call teardown...', reason);
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());

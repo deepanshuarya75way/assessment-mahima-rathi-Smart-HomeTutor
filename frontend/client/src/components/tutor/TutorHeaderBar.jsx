@@ -2,8 +2,8 @@ import React from 'react';
 
 export const TutorHeaderBar = ({ onRequestPayout, onRequestCertificate, onEditProfile, isApproved = true, onToggleMobileMenu }) => {
   return (
-    <div className="dashboard-header-bar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <div className="dashboard-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', width: '100%', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 300px', minWidth: 0 }}>
         <button
           type="button"
           className="mobile-hamburger-btn"
@@ -18,7 +18,7 @@ export const TutorHeaderBar = ({ onRequestPayout, onRequestCertificate, onEditPr
           <p>Manage your teaching schedule, accept booking requests, review student attendance, and request payouts.</p>
         </div>
       </div>
-      <div className="dashboard-actions" style={{ display: 'flex', gap: '10px' }}>
+      <div className="dashboard-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto', flexShrink: 0 }}>
         <button
           type="button"
           className="dash-btn dash-btn-outline"

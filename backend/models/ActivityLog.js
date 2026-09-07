@@ -43,4 +43,8 @@ const activityLogSchema = new mongoose.Schema(
   }
 );
 
+// Indexes for security audit log filtering
+activityLogSchema.index({ user: 1, createdAt: -1 });
+activityLogSchema.index({ category: 1, createdAt: -1 });
+
 module.exports = mongoose.model("ActivityLog", activityLogSchema);

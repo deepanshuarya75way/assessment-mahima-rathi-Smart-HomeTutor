@@ -42,7 +42,7 @@ export const RegularClassPaymentModal = ({ isOpen, onClose, tutor, onSuccess, wa
       if (walletRes && walletRes.success) {
         setPaymentState({
           status: 'success',
-          message: '✅ Smart Wallet Payment Verified Successfully!',
+          message: 'Smart Wallet Payment Verified Successfully!',
           paymentId: walletRes.payment ? walletRes.payment.paymentId : `pay_wallet_${Date.now()}`,
         });
         setTimeout(() => setStep('booking'), 1200);
@@ -106,7 +106,7 @@ export const RegularClassPaymentModal = ({ isOpen, onClose, tutor, onSuccess, wa
             if (verifyRes.success) {
               setPaymentState({
                 status: 'success',
-                message: '✅ Payment Verified Successfully!',
+                message: 'Payment Verified Successfully!',
                 paymentId: response.razorpay_payment_id || orderRes.orderId,
               });
               // Transition to Booking Form Step
@@ -158,7 +158,7 @@ export const RegularClassPaymentModal = ({ isOpen, onClose, tutor, onSuccess, wa
         if (verifyRes.success) {
           setPaymentState({
             status: 'success',
-            message: '✅ Simulated Payment Verified Successfully!',
+            message: 'Simulated Payment Verified Successfully!',
             paymentId: `pay_sim_${Date.now()}`,
           });
           setTimeout(() => setStep('booking'), 1200);
@@ -194,7 +194,7 @@ export const RegularClassPaymentModal = ({ isOpen, onClose, tutor, onSuccess, wa
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setAlertMsg({ type: 'success', text: '🎉 Regular Class Booked Successfully! Tutor has been notified.' });
+        setAlertMsg({ type: 'success', text: 'Regular Class Booked Successfully! Tutor has been notified.' });
         setStep('completed');
         if (onSuccess) onSuccess('Regular Class Booked Successfully!');
         setTimeout(() => {

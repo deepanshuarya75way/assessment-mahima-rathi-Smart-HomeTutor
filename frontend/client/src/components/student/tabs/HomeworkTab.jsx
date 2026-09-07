@@ -84,7 +84,7 @@ export const HomeworkTab = () => {
       const res = await studentApi.submitHomework(formData);
       if (res.success) {
         const targetTutorName = tutors.find((t) => t._id === selectedTutor)?.name || 'Tutor';
-        setMsg(`✅ Homework "${title}" submitted to ${targetTutorName} successfully!`);
+        setMsg(`Homework "${title}" submitted to ${targetTutorName} successfully!`);
         setTitle('');
         setSubject('');
         setDescription('');

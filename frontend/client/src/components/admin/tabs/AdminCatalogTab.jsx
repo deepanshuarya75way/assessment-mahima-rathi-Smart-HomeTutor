@@ -45,7 +45,7 @@ export const AdminCatalogTab = ({ subjects = [], onOpenAddSubject, onUpdateSubje
     {
       id: 'c11-12-sci',
       title: 'Class 11–12',
-      badge: '🔬 Science',
+      badge: 'Science',
       icon: 'fa-flask',
       accentColor: '#8b5cf6',
       defaultTopics: ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Computer Science', 'English'],
@@ -54,7 +54,7 @@ export const AdminCatalogTab = ({ subjects = [], onOpenAddSubject, onUpdateSubje
     {
       id: 'c11-12-com',
       title: 'Class 11–12',
-      badge: '💼 Commerce',
+      badge: 'Commerce',
       icon: 'fa-briefcase',
       accentColor: '#ec4899',
       defaultTopics: ['Accountancy', 'Business Studies', 'Economics', 'Mathematics', 'Entrepreneurship', 'Informatics Prac.', 'English'],
@@ -63,7 +63,7 @@ export const AdminCatalogTab = ({ subjects = [], onOpenAddSubject, onUpdateSubje
     {
       id: 'c11-12-hum',
       title: 'Class 11–12',
-      badge: '🎨 Humanities',
+      badge: 'Humanities',
       icon: 'fa-palette',
       accentColor: '#06b6d4',
       defaultTopics: ['History', 'Political Science', 'Geography', 'Sociology', 'Psychology', 'Economics', 'English'],

@@ -4,7 +4,7 @@ const { logUserActivity } = require("../utils/activityLogHelper");
 const getJwtSecret = () => process.env.JWT_SECRET || "HomeTutor_Secret_Key_2026";
 
 // Middleware to verify JWT authentication token
-exports.requireAuth = (req, res, next) => {
+exports.requireAuth = async (req, res, next) => {
   let token = req.cookies?.token;
 
   if (!token && req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
@@ -20,6 +20,20 @@ exports.requireAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
+
+    // Import User model to verify account status
+    const User = require("../models/User");
+    const dbUser = await User.findById(decoded.id).select("accountStatus name email role");
+
+    if (dbUser && dbUser.accountStatus === "Discontinued") {
+      res.clearCookie("token");
+      const discMsg = "Your account has been discontinued. Please contact support if you believe this is an error.";
+      if (req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json")) {
+        return res.status(401).json({ success: false, message: discMsg });
+      }
+      return res.redirect("/login?message=" + encodeURIComponent(discMsg));
+    }
+
     let formattedName = decoded.name || decoded.email;
     if (formattedName && formattedName.includes('@')) {
       formattedName = formattedName.split('@')[0];

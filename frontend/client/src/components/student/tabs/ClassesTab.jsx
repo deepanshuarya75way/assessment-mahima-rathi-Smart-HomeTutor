@@ -85,7 +85,13 @@ export const ClassesTab = ({ onStartVideoCall }) => {
               ) : (
                 filteredSchedule.map((item) => {
                   const isOnline = !item.mode || item.mode.toLowerCase() === 'online';
-                  const isCompleted = item.status === 'Completed' || item.status === 'Cancelled';
+                  const isInactiveStatus = ['Completed', 'Cancelled', 'Discontinued', 'Missed', 'Rejected'].includes(item.status);
+                  
+                  // Check if schedule date is in the past
+                  const scheduleTime = item.date ? new Date(item.date).getTime() : 0;
+                  const isPastDate = scheduleTime > 0 && scheduleTime + (24 * 60 * 60 * 1000) < Date.now();
+                  const isExpiredOrEnded = isInactiveStatus || (isPastDate && item.status !== 'Scheduled' && item.status !== 'Rescheduled');
+
                   const formattedDate = new Date(item.date || Date.now()).toLocaleDateString('en-IN', {
                     day: 'numeric',
                     month: 'short',
@@ -109,9 +115,16 @@ export const ClassesTab = ({ onStartVideoCall }) => {
                         <div style={{ fontSize: '11px', color: '#64748b' }}>{formattedDate}</div>
                       </td>
                       <td>
-                        {isCompleted ? (
-                          <span style={{ background: '#f1f5f9', color: '#64748b', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
-                            {item.status}
+                        {isExpiredOrEnded ? (
+                          <span style={{
+                            background: item.status === 'Cancelled' || item.status === 'Discontinued' ? '#fee2e2' : '#f1f5f9',
+                            color: item.status === 'Cancelled' || item.status === 'Discontinued' ? '#b91c1c' : '#64748b',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: '700'
+                          }}>
+                            {item.status || 'Past Class'}
                           </span>
                         ) : isOnline ? (
                           <button

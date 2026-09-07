@@ -282,11 +282,13 @@ function initVideoCallSocket(io) {
     // Join Video Room (WebRTC Page)
     socket.on("join-video-room", async ({ bookingId, userId, userName, userRole }) => {
       try {
-        if (!bookingId || !userId) return;
         const bIdStr = bookingId.toString();
-
         const booking = await findBookingOrScheduleSocket(bIdStr);
-        if (!booking || booking.status !== "Accepted") {
+
+        const validStatuses = ["Accepted", "Confirmed", "Approved", "Scheduled"];
+        const isStatusValid = booking && (validStatuses.includes(booking.status) || (booking.adminApproved && booking.tutorApproved));
+
+        if (!booking || !isStatusValid) {
           socket.emit("video-error", { message: "Class session or booking is not accepted or invalid." });
           return;
         }

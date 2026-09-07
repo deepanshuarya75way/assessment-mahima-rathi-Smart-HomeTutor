@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export const Header = ({ activePage = 'home' }) => {
@@ -44,13 +45,13 @@ export const Header = ({ activePage = 'home' }) => {
     <header className="react-header">
       <div className="container navbar">
         <div className="logo">
-          <a href="/" className="brand-logo-link">
+          <Link to="/" className="brand-logo-link">
             <img src="/images/logo.png" alt="Smart HomeTutor Logo" className="site-logo-img" />
             <div className="brand-text-stack">
               <span className="brand-smart">Smart</span>
               <span className="brand-hometutor">HomeTutor</span>
             </div>
-          </a>
+          </Link>
         </div>
 
         <button
@@ -67,29 +68,29 @@ export const Header = ({ activePage = 'home' }) => {
           <nav>
             <ul>
               <li>
-                <a href="/" className={activePage === 'home' ? 'active' : ''} onClick={closeMobileMenu}>
+                <Link to="/" className={activePage === 'home' ? 'active' : ''} onClick={closeMobileMenu}>
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/find" className={activePage === 'find' ? 'active' : ''} onClick={closeMobileMenu}>
+                <Link to="/find" className={activePage === 'find' ? 'active' : ''} onClick={closeMobileMenu}>
                   Find Tutors
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/subjects" className={activePage === 'subjects' ? 'active' : ''} onClick={closeMobileMenu}>
+                <Link to="/subjects" className={activePage === 'subjects' ? 'active' : ''} onClick={closeMobileMenu}>
                   Subjects
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/tutor" className={activePage === 'tutor' ? 'active' : ''} onClick={closeMobileMenu}>
+                <Link to="/tutor" className={activePage === 'tutor' ? 'active' : ''} onClick={closeMobileMenu}>
                   Become a Tutor
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/contact" className={activePage === 'contact' ? 'active' : ''} onClick={closeMobileMenu}>
+                <Link to="/contact" className={activePage === 'contact' ? 'active' : ''} onClick={closeMobileMenu}>
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </nav>
@@ -97,15 +98,15 @@ export const Header = ({ activePage = 'home' }) => {
           <div className="buttons">
             {isAuth && userRole ? (
               <>
-                <a
-                  href={`/dashboard/${userRole}`}
+                <Link
+                  to={`/dashboard/${userRole}`}
                   className="signup"
                   style={{ fontSize: '13px', textTransform: 'none', fontWeight: 700 }}
                   title={`${cleanName} (${roleTitle})`}
                   onClick={closeMobileMenu}
                 >
                   <i className={`fa-solid ${roleIcon}`}></i> {cleanName} ({roleTitle})
-                </a>
+                </Link>
                 <a
                   href="/logout"
                   className="login"
@@ -117,12 +118,12 @@ export const Header = ({ activePage = 'home' }) => {
               </>
             ) : (
               <>
-                <a href="/signup" className="signup" onClick={closeMobileMenu}>
+                <Link to="/signup" className="signup" onClick={closeMobileMenu}>
                   Join Now
-                </a>
-                <a href="/login" className="login" onClick={closeMobileMenu}>
+                </Link>
+                <Link to="/login" className="login" onClick={closeMobileMenu}>
                   Log in
-                </a>
+                </Link>
               </>
             )}
           </div>

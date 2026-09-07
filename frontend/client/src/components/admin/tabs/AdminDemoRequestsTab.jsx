@@ -264,10 +264,10 @@ export const AdminDemoRequestsTab = () => {
                               {isPendingTutor
                                 ? '⏳ Pending Tutor Acceptance'
                                 : isConfirmed
-                                ? '✅ Confirmed Class'
+                                ? 'Confirmed Class'
                                 : isRejectedTutor
-                                ? '🚫 Declined by Tutor'
-                                : '❌ Rejected by Admin'}
+                                ? 'Declined by Tutor'
+                                : 'Rejected by Admin'}
                             </span>
                           )}
 

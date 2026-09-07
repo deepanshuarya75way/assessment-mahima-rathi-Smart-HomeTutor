@@ -283,7 +283,7 @@ export const UserComplaintsTab = ({ roleName = 'Student' }) => {
                           marginLeft: '4px',
                         }}
                       >
-                        🔴 {ticket.unreadCountUser} new
+                        {ticket.unreadCountUser} new
                       </span>
                     )}
                   </button>

@@ -91,7 +91,7 @@ export const TopupWalletModal = ({ isOpen, onClose, walletBalance = 0, onSuccess
 
             if (verifyRes && verifyRes.success) {
               const newBal = verifyRes.walletBalance !== undefined ? verifyRes.walletBalance : (walletBalance + amountToTopup);
-              setStatusMsg({ type: 'success', text: `🎉 ₹${amountToTopup} credited to your Smart Wallet!` });
+              setStatusMsg({ type: 'success', text: `₹${amountToTopup} credited to your Smart Wallet!` });
               if (onSuccess) onSuccess(newBal, `₹${amountToTopup} added to your Smart Wallet!`);
               setTimeout(() => {
                 onClose();
@@ -146,7 +146,7 @@ export const TopupWalletModal = ({ isOpen, onClose, walletBalance = 0, onSuccess
         setLoading(false);
         if (verifyRes && verifyRes.success) {
           const newBal = verifyRes.walletBalance !== undefined ? verifyRes.walletBalance : (walletBalance + amountToTopup);
-          setStatusMsg({ type: 'success', text: `🎉 ₹${amountToTopup} credited to Smart Wallet (Simulated)!` });
+          setStatusMsg({ type: 'success', text: `₹${amountToTopup} credited to Smart Wallet (Simulated)!` });
           if (onSuccess) onSuccess(newBal, `₹${amountToTopup} added to Smart Wallet!`);
           setTimeout(() => {
             onClose();

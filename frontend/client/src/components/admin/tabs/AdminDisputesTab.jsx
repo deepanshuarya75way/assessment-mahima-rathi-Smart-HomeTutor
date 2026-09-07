@@ -415,7 +415,7 @@ export const AdminDisputesTab = () => {
                               marginLeft: '4px',
                             }}
                           >
-                            🔴 {item.unreadCountAdmin} unread
+                            {item.unreadCountAdmin} unread
                           </span>
                         )}
                       </button>

@@ -1102,12 +1102,7 @@ pre,
   display: flex;
   gap: 24px;
   width: max-content;
-  animation: marqueeScroll 35s linear infinite;
-  transition: transform 0.5s ease;
-}
-
-.testimonial-marquee-wrapper:hover .testimonial-marquee-track {
-  animation-play-state: paused;
+  will-change: transform;
 }
 
 @keyframes marqueeScroll {
@@ -2304,6 +2299,8 @@ pre,
   margin-bottom: 16px;
   font-weight: 700;
   font-size: 14px;
+  gap: 10px;
+  flex-wrap: nowrap;
 }
 
 .ft-tutor-meta-bar .rating {
@@ -2311,16 +2308,27 @@ pre,
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ft-tutor-meta-bar .rating i {
   color: #f59e0b;
 }
 
-.ft-tutor-meta-bar .fee {
+.ft-tutor-meta-bar .fee,
+.fee,
+.tutor-price,
+.price-val {
   color: var(--accent-hover);
   font-size: 17px;
   font-weight: 800;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  word-wrap: normal !important;
+  flex-shrink: 0 !important;
+  display: inline-block;
 }
 
 .ft-tutor-actions-row {
@@ -2509,8 +2517,8 @@ pre,
 
 /* Scroll & Entrance Animations */
 .ct-reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(28px);
+  opacity: 1;
+  transform: translateY(0);
   transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }

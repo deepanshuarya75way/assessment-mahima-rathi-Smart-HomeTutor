@@ -55,6 +55,7 @@ const notificationSchema = new mongoose.Schema(
         "system",
         "booking",
         "message",
+        "class_discontinued",
       ],
       default: "system",
     },
@@ -84,5 +85,9 @@ notificationSchema.pre("save", function () {
     this.isRead = this.read;
   }
 });
+
+// Indexes for notification queries
+notificationSchema.index({ user: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ role: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Notification", notificationSchema);

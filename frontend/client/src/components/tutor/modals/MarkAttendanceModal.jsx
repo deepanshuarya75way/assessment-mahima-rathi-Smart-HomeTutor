@@ -40,7 +40,7 @@ export const MarkAttendanceModal = ({ isOpen, onClose, schedule, onSuccess }) =>
 
       const data = await res.json();
       if (data.success) {
-        setSuccessMsg(`✅ Student attendance marked as ${status}!`);
+        setSuccessMsg(`Student attendance marked as ${status}!`);
         setTimeout(() => {
           if (onSuccess) onSuccess(data);
           onClose();

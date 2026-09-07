@@ -1651,7 +1651,7 @@ exports.sendBulkNotification = async (req, res) => {
  */
 exports.getAdminNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ role: "admin" })
+    const notifications = await Notification.find({ user: req.user.id, role: "admin" })
       .populate("sourceUser", "name email role phone")
       .sort({ createdAt: -1 });
 
@@ -1674,7 +1674,7 @@ exports.getAdminNotifications = async (req, res) => {
  */
 exports.getAdminUnreadCount = async (req, res) => {
   try {
-    const unreadCount = await Notification.countDocuments({ role: "admin", $or: [{ isRead: false }, { read: false }] });
+    const unreadCount = await Notification.countDocuments({ user: req.user.id, role: "admin", $or: [{ isRead: false }, { read: false }] });
     return res.status(200).json({ success: true, unreadCount });
   } catch (err) {
     console.error("Get Admin Unread Count Error:", err);
@@ -1682,8 +1682,8 @@ exports.getAdminUnreadCount = async (req, res) => {
   }
 };
 
-const getAdminUnreadCountFromDB = async () => {
-  return await Notification.countDocuments({ role: "admin", $or: [{ isRead: false }, { read: false }] });
+const getAdminUnreadCountFromDB = async (userId) => {
+  return await Notification.countDocuments({ user: userId, role: "admin", $or: [{ isRead: false }, { read: false }] });
 };
 
 /**
@@ -1692,8 +1692,8 @@ const getAdminUnreadCountFromDB = async () => {
 exports.markAdminNotificationAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const notification = await Notification.findByIdAndUpdate(
-      id,
+    const notification = await Notification.findOneAndUpdate(
+      { _id: id, user: req.user.id },
       { isRead: true, read: true },
       { new: true }
     );
@@ -1701,11 +1701,11 @@ exports.markAdminNotificationAsRead = async (req, res) => {
       return res.status(404).json({ success: false, message: "Notification not found." });
     }
 
-    const unreadCount = await getAdminUnreadCountFromDB();
+    const unreadCount = await getAdminUnreadCountFromDB(req.user.id);
 
     const io = req.app.get("io");
     if (io) {
-      io.emit("unreadCountChanged", { role: "admin", unreadCount });
+      io.to(req.user.id.toString()).emit("unreadCountChanged", { role: "admin", unreadCount });
     }
 
     return res.status(200).json({ success: true, message: "Notification marked as read.", unreadCount, notification });
@@ -1720,11 +1720,11 @@ exports.markAdminNotificationAsRead = async (req, res) => {
  */
 exports.markAllAdminNotificationsAsRead = async (req, res) => {
   try {
-    await Notification.updateMany({ role: "admin" }, { isRead: true, read: true });
+    await Notification.updateMany({ user: req.user.id, role: "admin" }, { isRead: true, read: true });
 
     const io = req.app.get("io");
     if (io) {
-      io.emit("unreadCountChanged", { role: "admin", unreadCount: 0 });
+      io.to(req.user.id.toString()).emit("unreadCountChanged", { role: "admin", unreadCount: 0 });
     }
 
     return res.status(200).json({ success: true, unreadCount: 0, message: "All admin notifications marked as read." });
@@ -1740,13 +1740,17 @@ exports.markAllAdminNotificationsAsRead = async (req, res) => {
 exports.deleteAdminNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    await Notification.findByIdAndDelete(id);
+    const deleted = await Notification.findOneAndDelete({ _id: id, user: req.user.id });
 
-    const unreadCount = await getAdminUnreadCountFromDB();
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Notification not found or unauthorized." });
+    }
+
+    const unreadCount = await getAdminUnreadCountFromDB(req.user.id);
 
     const io = req.app.get("io");
     if (io) {
-      io.emit("unreadCountChanged", { role: "admin", unreadCount });
+      io.to(req.user.id.toString()).emit("unreadCountChanged", { role: "admin", unreadCount });
     }
 
     return res.status(200).json({ success: true, unreadCount, message: "Notification deleted successfully." });

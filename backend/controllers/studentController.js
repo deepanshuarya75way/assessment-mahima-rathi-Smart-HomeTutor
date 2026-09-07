@@ -1,6 +1,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const BookingRequest = require("../models/BookingRequest");
 const TutorProfile = require("../models/TutorProfile");
@@ -451,6 +452,178 @@ exports.topupWallet = async (req, res) => {
   });
 };
 
+const getActiveRegularTutorsForStudent = async (userId) => {
+  // 1. Find all verified fee payments made by this student
+  const verifiedPayments = await Payment.find({
+    user: userId,
+    paymentStatus: { $in: ["Success", "Paid", "Completed"] },
+    tutor: { $exists: true, $ne: null },
+  })
+    .populate("tutor", "name email role profileImage avatar")
+    .populate({
+      path: "booking",
+      select: "tutor tutorProfile subject status isTrial",
+      populate: [
+        { path: "tutor", select: "name email role profileImage avatar" },
+        {
+          path: "tutorProfile",
+          select: "primarySubject user hourlyRate rating subjects",
+          populate: { path: "user", select: "name email role profileImage avatar" },
+        },
+      ],
+    })
+    .sort({ createdAt: -1 });
+
+  // 2. Find all confirmed / accepted / paid regular class booking requests for this student
+  const confirmedBookings = await BookingRequest.find({
+    student: userId,
+    isTrial: false,
+    status: { $nin: ["Rejected", "Rejected by Admin", "Rejected by Tutor", "Cancelled", "Discontinued"] },
+  })
+    .populate("tutor", "name email role profileImage avatar")
+    .populate({
+      path: "tutorProfile",
+      select: "primarySubject user hourlyRate rating subjects",
+      populate: { path: "user", select: "name email role profileImage avatar" },
+    })
+    .sort({ createdAt: -1 });
+
+  // Find discontinued / cancelled regular class booking requests for this student
+  const discontinuedBookings = await BookingRequest.find({
+    student: userId,
+    isTrial: false,
+    status: { $in: ["Discontinued", "Cancelled", "Rejected", "Rejected by Admin", "Rejected by Tutor"] },
+  }).select("tutor tutorProfile");
+
+  const discontinuedTutorSet = new Set();
+  discontinuedBookings.forEach((b) => {
+    if (b.tutor) discontinuedTutorSet.add(b.tutor.toString());
+    if (b.tutorProfile) discontinuedTutorSet.add(b.tutorProfile.toString());
+  });
+
+  const rawTutorIds = new Set();
+
+  verifiedPayments.forEach((p) => {
+    if (p.tutor) {
+      const idStr = p.tutor._id ? p.tutor._id.toString() : p.tutor.toString();
+      rawTutorIds.add(idStr);
+    }
+    if (p.booking) {
+      if (p.booking.tutor) {
+        const bTutorId = p.booking.tutor._id ? p.booking.tutor._id.toString() : p.booking.tutor.toString();
+        rawTutorIds.add(bTutorId);
+      }
+      if (p.booking.tutorProfile) {
+        const bTpId = p.booking.tutorProfile._id ? p.booking.tutorProfile._id.toString() : p.booking.tutorProfile.toString();
+        rawTutorIds.add(bTpId);
+        if (p.booking.tutorProfile.user) {
+          const bTpUserId = p.booking.tutorProfile.user._id ? p.booking.tutorProfile.user._id.toString() : p.booking.tutorProfile.user.toString();
+          rawTutorIds.add(bTpUserId);
+        }
+      }
+    }
+  });
+
+  for (const b of confirmedBookings) {
+    const tutorUserId = b.tutor
+      ? (b.tutor._id ? b.tutor._id.toString() : b.tutor.toString())
+      : (b.tutorProfile && b.tutorProfile.user
+      ? (b.tutorProfile.user._id ? b.tutorProfile.user._id.toString() : b.tutorProfile.user.toString())
+      : null);
+
+    const tutorProfId = b.tutorProfile ? (b.tutorProfile._id ? b.tutorProfile._id.toString() : b.tutorProfile.toString()) : null;
+
+    // Check if there is a verified payment for this booking or tutor
+    const hasPayment = await Payment.exists({
+      user: userId,
+      $or: [
+        { booking: b._id },
+        ...(tutorUserId ? [{ tutor: tutorUserId }] : []),
+        ...(tutorProfId ? [{ tutor: tutorProfId }] : []),
+      ],
+      paymentStatus: { $in: ["Success", "Paid", "Completed"] },
+    });
+
+    if (hasPayment || b.isChatUnlocked) {
+      if (tutorUserId) rawTutorIds.add(tutorUserId);
+      if (tutorProfId) rawTutorIds.add(tutorProfId);
+    }
+  }
+
+  // Exclude discontinued tutors unless an active regular booking exists
+  for (const discId of discontinuedTutorSet) {
+    const hasActive = await BookingRequest.exists({
+      student: userId,
+      isTrial: false,
+      $or: [{ tutor: discId }, { tutorProfile: discId }],
+      status: { $nin: ["Rejected", "Rejected by Admin", "Rejected by Tutor", "Cancelled", "Discontinued"] },
+    });
+    if (!hasActive) {
+      rawTutorIds.delete(discId);
+    }
+  }
+
+  if (rawTutorIds.size === 0) {
+    return [];
+  }
+
+  const idArray = Array.from(rawTutorIds);
+
+  // Retrieve TutorProfiles that match either `user` in idArray or `_id` in idArray
+  const tutorProfiles = await TutorProfile.find({
+    $or: [{ user: { $in: idArray } }, { _id: { $in: idArray } }],
+  }).populate("user", "name email profileImage avatar");
+
+  const tutorsMap = new Map();
+
+  for (const tp of tutorProfiles) {
+    const tutorUser = tp.user;
+    const uId = tutorUser ? tutorUser._id.toString() : tp._id.toString();
+
+    if (!tutorsMap.has(uId)) {
+      let subjectName =
+        tp.primarySubject ||
+        (Array.isArray(tp.subjects) && tp.subjects.length > 0 ? tp.subjects[0] : "Regular Classes Tuition");
+
+      tutorsMap.set(uId, {
+        _id: uId,
+        tutorProfileId: tp._id.toString(),
+        name: tutorUser ? tutorUser.name || "Tutor" : "Tutor",
+        email: tutorUser ? tutorUser.email || "" : "",
+        avatar: tutorUser ? tutorUser.profileImage || tutorUser.avatar || "" : "",
+        subject: subjectName,
+        statusBadge: "🟢 Regular Classes Tutor",
+        fee: tp.hourlyRate || 500,
+        rating: tp.rating || 5.0,
+      });
+    }
+  }
+
+  // Also check any User records directly if TutorProfile wasn't found
+  for (const idStr of idArray) {
+    if (!tutorsMap.has(idStr)) {
+      const u = await User.findById(idStr).select("name email role profileImage avatar");
+      if (u && u.role === "tutor") {
+        tutorsMap.set(idStr, {
+          _id: idStr,
+          tutorProfileId: idStr,
+          name: u.name || "Tutor",
+          email: u.email || "",
+          avatar: u.profileImage || u.avatar || "",
+          subject: "Regular Classes Tuition",
+          statusBadge: "🟢 Regular Classes Tutor",
+          fee: 500,
+          rating: 5.0,
+        });
+      }
+    }
+  }
+
+  return Array.from(tutorsMap.values());
+};
+
+exports.getActiveRegularTutorsForStudent = getActiveRegularTutorsForStudent;
+
 exports.getStudentDashboardStats = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -468,23 +641,14 @@ exports.getStudentDashboardStats = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    const acceptedBookings = bookings.filter(
-      (b) => b.status === "Accepted" && b.tutor
-    );
-
     const pendingBookings = bookings.filter(
-      (b) => b.status === "Pending"
+      (b) => b.status === "Pending" || b.status === "Pending Admin Approval" || b.status === "Pending Tutor Acceptance"
     );
 
-    const uniqueTutorIds = [
-      ...new Set(
-        acceptedBookings.map((b) =>
-          b.tutor?._id
-            ? b.tutor._id.toString()
-            : b.tutor.toString()
-        )
-      ),
-    ];
+    // Active Regular Tutors Calculation:
+    // Shared active tutor derivation ensuring 100% data consistency with My Tutors
+    const activeTutorsList = await getActiveRegularTutorsForStudent(studentId);
+    const activeTutorCount = activeTutorsList.length;
     const upcomingClasses = await ClassSchedule.find({
       student: studentId,
       status: { $in: ["Scheduled", "Rescheduled"] },
@@ -514,7 +678,8 @@ exports.getStudentDashboardStats = async (req, res) => {
 
     const transactions = await Transaction.find({ user: studentId }).sort({ createdAt: -1 });
 
-    const completedClasses = await ClassSchedule.countDocuments({ student: studentId, status: "Completed" });
+    const completedClassDocsCount = await ClassSchedule.countDocuments({ student: studentId, status: "Completed" });
+    const completedClasses = Math.max(completedClassDocsCount, presentClasses);
     const progressPercentage = totalClasses > 0 ? Math.min(100, Math.round((completedClasses / Math.max(totalClasses, 1)) * 100)) : 0;
 
     // Ensure student has a valid referral code
@@ -533,7 +698,8 @@ exports.getStudentDashboardStats = async (req, res) => {
       success: true,
       stats: {
         upcomingClassesCount: upcomingClasses.length,
-        activeTutorsCount: uniqueTutorIds.length,
+        activeTutorsCount: activeTutorCount,
+        activeTutorCount: activeTutorCount,
         pendingBookingsCount: pendingBookings.length,
         walletBalance: student ? student.walletBalance : 0,
         studyMaterialsCount: notes.length + materials.length,
@@ -755,60 +921,15 @@ exports.getStudentClassSchedule = async (req, res) => {
   try {
     const studentId = req.user.id;
 
-    // 1. Fetch official class schedules
+    // Fetch official class schedules
     const schedules = await ClassSchedule.find({ student: studentId })
       .populate("tutor", "name email phone")
       .sort({ date: 1, startTime: 1 });
 
-    // 2. Fetch accepted/approved booking requests for active tutor relationships
-    const acceptedBookings = await BookingRequest.find({
-      student: studentId,
-      status: { $in: ["Accepted", "Approved", "Confirmed"] },
-    })
-      .populate("tutor", "name email phone")
-      .populate({
-        path: "tutorProfile",
-        select: "subjects qualification location fee mode primarySubject",
-      })
-      .sort({ updatedAt: -1 });
-
-    const scheduledBookingIds = new Set(
-      schedules.filter((s) => s.booking).map((s) => s.booking.toString())
-    );
-
-    // 3. Synthesize schedule items for accepted bookings without an explicit ClassSchedule entry
-    const synthesizedSchedules = acceptedBookings
-      .filter((b) => !scheduledBookingIds.has(b._id.toString()))
-      .map((b) => {
-        let subjStr = "Tuition Class";
-        if (b.tutorProfile && Array.isArray(b.tutorProfile.subjects) && b.tutorProfile.subjects.length > 0) {
-          subjStr = b.tutorProfile.subjects.filter(Boolean).join(", ");
-        } else if (b.tutorProfile && b.tutorProfile.primarySubject) {
-          subjStr = b.tutorProfile.primarySubject;
-        }
-
-        return {
-          _id: b._id,
-          subject: subjStr,
-          tutor: b.tutor,
-          frequency: "Regular Session",
-          days: "Scheduled Days",
-          startTime: "05:00 PM",
-          endTime: "06:00 PM",
-          date: b.updatedAt || b.createdAt,
-          mode: b.isHomeVisit ? "Offline" : (b.tutorProfile?.mode || "Online"),
-          status: "Scheduled",
-          isBookingFallback: true,
-        };
-      });
-
-    const combinedSchedules = [...schedules, ...synthesizedSchedules];
-
     return res.status(200).json({
       success: true,
-      schedules: combinedSchedules,
+      schedules,
       officialSchedulesCount: schedules.length,
-      acceptedBookingsCount: acceptedBookings.length,
     });
   } catch (err) {
     console.error("Get Student Class Schedule Error:", err);
@@ -1114,151 +1235,7 @@ exports.getMyTutors = async (req, res) => {
       return res.status(404).json({ success: false, message: "Student account not found." });
     }
 
-    // 1. Find all verified fee payments made by this student
-    const verifiedPayments = await Payment.find({
-      user: userId,
-      paymentStatus: { $in: ["Success", "Paid", "Completed"] },
-      paymentType: { $in: ["Tuition Fee Payment", "Tuition Invoice Payment"] },
-      tutor: { $exists: true, $ne: null },
-    })
-      .populate("tutor", "name email role profileImage avatar")
-      .populate({
-        path: "booking",
-        select: "tutor tutorProfile subject status isTrial",
-        populate: [
-          { path: "tutor", select: "name email role profileImage avatar" },
-          {
-            path: "tutorProfile",
-            select: "primarySubject user hourlyRate rating subjects",
-            populate: { path: "user", select: "name email role profileImage avatar" },
-          },
-        ],
-      })
-      .sort({ createdAt: -1 });
-
-    // 2. Find all confirmed / accepted / paid regular class booking requests for this student
-    const confirmedBookings = await BookingRequest.find({
-      student: userId,
-      isTrial: false,
-    })
-      .populate("tutor", "name email role profileImage avatar")
-      .populate({
-        path: "tutorProfile",
-        select: "primarySubject user hourlyRate rating subjects",
-        populate: { path: "user", select: "name email role profileImage avatar" },
-      })
-      .sort({ createdAt: -1 });
-
-    const rawTutorIds = new Set();
-
-    verifiedPayments.forEach((p) => {
-      if (p.tutor) {
-        const idStr = p.tutor._id ? p.tutor._id.toString() : p.tutor.toString();
-        rawTutorIds.add(idStr);
-      }
-      if (p.booking) {
-        if (p.booking.tutor) {
-          const bTutorId = p.booking.tutor._id ? p.booking.tutor._id.toString() : p.booking.tutor.toString();
-          rawTutorIds.add(bTutorId);
-        }
-        if (p.booking.tutorProfile) {
-          const bTpId = p.booking.tutorProfile._id ? p.booking.tutorProfile._id.toString() : p.booking.tutorProfile.toString();
-          rawTutorIds.add(bTpId);
-          if (p.booking.tutorProfile.user) {
-            const bTpUserId = p.booking.tutorProfile.user._id ? p.booking.tutorProfile.user._id.toString() : p.booking.tutorProfile.user.toString();
-            rawTutorIds.add(bTpUserId);
-          }
-        }
-      }
-    });
-
-    for (const b of confirmedBookings) {
-      const tutorUserId = b.tutor
-        ? (b.tutor._id ? b.tutor._id.toString() : b.tutor.toString())
-        : (b.tutorProfile && b.tutorProfile.user
-        ? (b.tutorProfile.user._id ? b.tutorProfile.user._id.toString() : b.tutorProfile.user.toString())
-        : null);
-
-      const tutorProfId = b.tutorProfile ? (b.tutorProfile._id ? b.tutorProfile._id.toString() : b.tutorProfile.toString()) : null;
-
-      // Check if there is a verified payment for this booking or tutor
-      const hasPayment = await Payment.exists({
-        user: userId,
-        $or: [
-          { booking: b._id },
-          ...(tutorUserId ? [{ tutor: tutorUserId }] : []),
-          ...(tutorProfId ? [{ tutor: tutorProfId }] : []),
-        ],
-        paymentStatus: { $in: ["Success", "Paid", "Completed"] },
-      });
-
-      if (hasPayment || b.isChatUnlocked) {
-        if (tutorUserId) rawTutorIds.add(tutorUserId);
-        if (tutorProfId) rawTutorIds.add(tutorProfId);
-      }
-    }
-
-    if (rawTutorIds.size === 0) {
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        tutors: [],
-      });
-    }
-
-    const idArray = Array.from(rawTutorIds);
-
-    // Retrieve TutorProfiles that match either `user` in idArray or `_id` in idArray
-    const tutorProfiles = await TutorProfile.find({
-      $or: [{ user: { $in: idArray } }, { _id: { $in: idArray } }],
-    }).populate("user", "name email profileImage avatar");
-
-    const tutorsMap = new Map();
-
-    for (const tp of tutorProfiles) {
-      const tutorUser = tp.user;
-      const uId = tutorUser ? tutorUser._id.toString() : tp._id.toString();
-
-      if (!tutorsMap.has(uId)) {
-        let subjectName =
-          tp.primarySubject ||
-          (Array.isArray(tp.subjects) && tp.subjects.length > 0 ? tp.subjects[0] : "Regular Classes Tuition");
-
-        tutorsMap.set(uId, {
-          _id: uId,
-          tutorProfileId: tp._id.toString(),
-          name: tutorUser ? tutorUser.name || "Tutor" : "Tutor",
-          email: tutorUser ? tutorUser.email || "" : "",
-          avatar: tutorUser ? tutorUser.profileImage || tutorUser.avatar || "" : "",
-          subject: subjectName,
-          statusBadge: "🟢 Regular Classes Tutor",
-          fee: tp.hourlyRate || 500,
-          rating: tp.rating || 5.0,
-        });
-      }
-    }
-
-    // Also check any User records directly if TutorProfile wasn't found
-    for (const idStr of idArray) {
-      if (!tutorsMap.has(idStr)) {
-        const u = await User.findById(idStr).select("name email role profileImage avatar");
-        if (u && u.role === "tutor") {
-          tutorsMap.set(idStr, {
-            _id: idStr,
-            tutorProfileId: idStr,
-            name: u.name || "Tutor",
-            email: u.email || "",
-            avatar: u.profileImage || u.avatar || "",
-            subject: "Regular Classes Tuition",
-            statusBadge: "🟢 Regular Classes Tutor",
-            fee: 500,
-            rating: 5.0,
-          });
-        }
-      }
-    }
-
-    const tutorsList = Array.from(tutorsMap.values());
+    const tutorsList = await getActiveRegularTutorsForStudent(userId);
 
     return res.status(200).json({
       success: true,
@@ -1399,3 +1376,248 @@ exports.getDemoStatuses = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
+/**
+ * PUT /api/student/profile
+ * Update logged-in student's profile information securely using req.user.id
+ */
+exports.updateProfile = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { name, phone, dob, gender, city, location, grade, profileImage, avatar } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: "Full Name cannot be empty." });
+    }
+
+    if (phone && !/^\d{10}$/.test(String(phone).trim())) {
+      return res.status(400).json({ success: false, message: "Phone number must contain exactly 10 digits." });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student account not found." });
+    }
+
+    if (name) student.name = name.trim();
+    if (phone !== undefined) student.phone = String(phone).trim();
+    if (dob !== undefined) student.dob = String(dob).trim();
+    if (gender !== undefined) student.gender = String(gender).trim();
+    if (city !== undefined) student.city = String(city).trim();
+    if (location !== undefined) student.location = String(location).trim();
+    if (grade !== undefined) student.grade = String(grade).trim();
+    if (profileImage !== undefined) student.profileImage = String(profileImage).trim();
+    if (avatar !== undefined) student.avatar = String(avatar).trim();
+
+    await student.save();
+
+    await logUserActivity(student._id, `Student profile updated for ${student.email}`, req.ip);
+
+    const updatedStudent = await User.findById(studentId).select("-password").populate("favorites");
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      student: updatedStudent,
+    });
+  } catch (err) {
+    console.error("Update Student Profile Error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
+ * PATCH /api/student/change-password
+ * Change password for logged-in student securely using req.user.id
+ */
+exports.changePassword = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, message: "Please fill in all password fields." });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "New password and confirmation password do not match." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: "New password must be at least 6 characters long." });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student account not found." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, student.password);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: "Incorrect current password." });
+    }
+
+    const isSame = await bcrypt.compare(newPassword, student.password);
+    if (isSame) {
+      return res.status(400).json({ success: false, message: "New password must be different from your current password." });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    student.password = await bcrypt.hash(newPassword, salt);
+    await student.save();
+
+    await logUserActivity(student._id, `Student changed password for ${student.email}`, req.ip);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully.",
+    });
+  } catch (err) {
+    console.error("Change Student Password Error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
+ * POST /api/student/discontinue-class
+ * Discontinue regular classes with a specific tutor for logged-in student using req.user.id.
+ * Preserves historical records, payments, and student account status.
+ */
+exports.discontinueClass = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { tutorId, reason } = req.body;
+
+    if (!tutorId || !mongoose.Types.ObjectId.isValid(tutorId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a valid tutor to discontinue regular classes.",
+      });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Student account not found." });
+    }
+
+    // Resolve target tutor user & tutor profile
+    let targetTutorUser = await User.findById(tutorId);
+    let targetTutorProfile = null;
+
+    if (targetTutorUser && targetTutorUser.role === "tutor") {
+      targetTutorProfile = await TutorProfile.findOne({ user: targetTutorUser._id });
+    } else {
+      targetTutorProfile = await TutorProfile.findById(tutorId).populate("user");
+      if (targetTutorProfile) {
+        targetTutorUser = targetTutorProfile.user;
+      }
+    }
+
+    if (!targetTutorUser) {
+      return res.status(404).json({ success: false, message: "Target tutor not found." });
+    }
+
+    const tutorUserId = targetTutorUser._id;
+    const tutorProfId = targetTutorProfile ? targetTutorProfile._id : null;
+
+    // Check if the student actually has active regular bookings / relationship with this tutor
+    const activeBookings = await BookingRequest.find({
+      student: student._id,
+      isTrial: false,
+      $or: [
+        { tutor: tutorUserId },
+        ...(tutorProfId ? [{ tutorProfile: tutorProfId }] : [])
+      ],
+      status: { $nin: ["Rejected", "Rejected by Admin", "Rejected by Tutor", "Cancelled", "Discontinued"] }
+    });
+
+    const activeSchedules = await ClassSchedule.find({
+      student: student._id,
+      tutor: tutorUserId,
+      status: "Scheduled"
+    });
+
+    const hasRegularPayment = await Payment.exists({
+      user: student._id,
+      $or: [{ tutor: tutorUserId }, ...(tutorProfId ? [{ tutor: tutorProfId }] : [])],
+      paymentStatus: { $in: ["Success", "Paid", "Completed"] }
+    });
+
+    if (activeBookings.length === 0 && activeSchedules.length === 0 && !hasRegularPayment) {
+      return res.status(400).json({
+        success: false,
+        message: "You do not have any active regular classes with this tutor to discontinue."
+      });
+    }
+
+    // 1. Mark active regular booking requests as Discontinued
+    await BookingRequest.updateMany(
+      {
+        student: student._id,
+        isTrial: false,
+        $or: [
+          { tutor: tutorUserId },
+          ...(tutorProfId ? [{ tutorProfile: tutorProfId }] : [])
+        ],
+        status: { $nin: ["Rejected", "Rejected by Admin", "Rejected by Tutor", "Cancelled", "Discontinued"] }
+      },
+      { $set: { status: "Discontinued" } }
+    );
+
+    // 2. Cancel upcoming scheduled classes for this student and tutor (Keep Completed classes intact)
+    await ClassSchedule.updateMany(
+      {
+        student: student._id,
+        tutor: tutorUserId,
+        status: "Scheduled"
+      },
+      { $set: { status: "Cancelled" } }
+    );
+
+    // 3. Audit Activity Log & Notifications
+    const tutorName = targetTutorUser.name || "Tutor";
+    const studentName = student.name || student.email || "Student";
+    const reasonText = reason ? ` (Reason: ${reason})` : "";
+
+    await logUserActivity(student._id, `Discontinued regular classes with tutor ${tutorName}${reasonText}`, req.ip);
+
+    await createNotification({
+      userId: student._id,
+      title: "Regular Classes Discontinued",
+      message: `Your regular classes with ${tutorName} have been discontinued. Your account remains active.`,
+      type: "class_discontinued",
+      app: req.app
+    });
+
+    await createNotification({
+      userId: tutorUserId,
+      title: "Class Discontinuation Notice",
+      message: `${studentName} has discontinued their regular classes with you${reasonText}.`,
+      type: "class_discontinued",
+      app: req.app
+    });
+
+    await createAdminNotification({
+      title: "Regular Class Discontinued",
+      message: `${studentName} discontinued regular classes with ${tutorName}${reasonText}.`,
+      sourceUser: student._id,
+      sourceRole: "student",
+      type: "class_discontinued",
+      actionUrl: "/dashboard/admin?tab=demo-requests",
+      app: req.app
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Regular classes with ${tutorName} have been discontinued successfully. Your account remains active.`,
+    });
+  } catch (err) {
+    console.error("Discontinue Class Error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
+ * Legacy endpoint alias for class discontinuation
+ */
+exports.discontinueAccount = exports.discontinueClass;

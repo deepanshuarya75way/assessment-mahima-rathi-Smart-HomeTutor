@@ -37,6 +37,15 @@ export const ForgotPassword = () => {
     if (emailParam) setEmail(emailParam);
     if (errorParam) setErrorMessage(errorParam);
     if (messageParam) setInfoMessage(messageParam);
+
+    if (errorParam || messageParam) {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.delete('error');
+      newParams.delete('message');
+      const newSearch = newParams.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
   }, [searchParams]);
 
   // Cooldown countdown effect

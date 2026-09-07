@@ -87,7 +87,7 @@ export const ContactForm = () => {
       if (data.success) {
         setFeedback({
           type: 'success',
-          message: '🎉 Your message has been sent successfully! Our team will get back to you soon.',
+          message: 'Your message has been sent successfully! Our team will get back to you soon.',
         });
         setFormData({
           name: '',
@@ -101,14 +101,14 @@ export const ContactForm = () => {
       } else {
         setFeedback({
           type: 'error',
-          message: '⚠️ ' + (data.message || 'Failed to submit enquiry. Please try again.'),
+          message: (data.message || 'Failed to submit enquiry. Please try again.'),
         });
       }
     } catch (err) {
       console.error('Contact submit error:', err);
       setFeedback({
         type: 'error',
-        message: '❌ An error occurred while sending message. Please try again.',
+        message: 'An error occurred while sending message. Please try again.',
       });
     } finally {
       setLoading(false);

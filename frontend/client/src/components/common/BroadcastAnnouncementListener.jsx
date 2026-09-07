@@ -120,7 +120,7 @@ export const BroadcastAnnouncementListener = () => {
             borderRadius: '12px',
           }}
         >
-          📢 Announcement ({announcement.targetRole || 'All Users'})
+          Announcement ({announcement.targetRole || 'All Users'})
         </span>
 
         <button

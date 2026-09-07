@@ -40,6 +40,14 @@ export const SignupPage = () => {
     if (errorParam) setErrorMessage(errorParam);
     if (refParam) setReferralCode(refParam.trim().toUpperCase());
 
+    if (errorParam) {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.delete('error');
+      const newSearch = newParams.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     // Scroll reveal observer
     const observer = new IntersectionObserver(
       (entries) => {

@@ -24,8 +24,8 @@ export const studentApi = {
     if (filters.feeMax) queryParams.append('fee', filters.feeMax);
     if (filters.search) queryParams.append('search', filters.search);
     if (filters.location) queryParams.append('location', filters.location);
-    if (filters.lat) queryParams.append('lat', filters.lat);
-    if (filters.lng) queryParams.append('lng', filters.lng);
+    if (filters.lat !== null && filters.lat !== undefined && filters.lat !== '') queryParams.append('lat', filters.lat);
+    if (filters.lng !== null && filters.lng !== undefined && filters.lng !== '') queryParams.append('lng', filters.lng);
     if (filters.radius && filters.radius !== 'all') queryParams.append('radius', filters.radius);
 
     const res = await fetch(`/api/tutor/all?${queryParams.toString()}`);
@@ -222,6 +222,46 @@ export const studentApi = {
 
   getPaymentHistory: async () => {
     const res = await fetch('/api/payment/history');
+    return await res.json();
+  },
+
+  // Update Profile
+  updateProfile: async (payload) => {
+    const res = await fetch('/api/student/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  },
+
+  // Change Password
+  changePassword: async (payload) => {
+    const res = await fetch('/api/student/change-password', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  },
+
+  // Discontinue Regular Classes with Selected Tutor
+  discontinueClass: async (payload) => {
+    const res = await fetch('/api/student/discontinue-class', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  },
+
+  // Discontinue Account / Legacy support
+  discontinueAccount: async (payload) => {
+    const res = await fetch('/api/student/discontinue-class', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     return await res.json();
   },
 };

@@ -133,7 +133,7 @@ export const BookDemoModal = ({
             <div style={{ display: 'flex', gap: '12px' }}>
               <label style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${isTrial ? '#0284c7' : '#cbd5e1'}`, background: isTrial ? '#f0f9ff' : '#f8fafc', cursor: isDemoDisabled ? 'not-allowed' : 'pointer', opacity: isDemoDisabled ? 0.55 : 1, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
                 <input type="radio" checked={isTrial} onChange={() => !isDemoDisabled && setIsTrial(true)} disabled={isDemoDisabled} />
-                <span>Free / Trial Demo Class {isDemoUsed ? '(Used ✓)' : isDemoPending ? '(Pending ⌛)' : ''}</span>
+                <span>Free / Trial Demo Class {isDemoUsed ? '(Used)' : isDemoPending ? '(Pending)' : ''}</span>
               </label>
               <label style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${!isTrial ? '#0284c7' : '#cbd5e1'}`, background: !isTrial ? '#f0f9ff' : '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600 }}>
                 <input type="radio" checked={!isTrial} onChange={() => setIsTrial(false)} />

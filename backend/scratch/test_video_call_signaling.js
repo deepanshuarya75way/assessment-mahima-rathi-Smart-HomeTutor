@@ -150,6 +150,26 @@ async function runVideoCallSignalingTest() {
     callerRole: "Tutor"
   });
 
+  let joinVideoRoomSuccess = false;
+  studentSocket.on("room-joined", (roomData) => {
+    console.log("\n✅ [STUDENT CLIENT] Successfully joined WebRTC video room:", roomData);
+    if (roomData && roomData.roomId === `room_${bookingIdStr}`) {
+      joinVideoRoomSuccess = true;
+    }
+  });
+
+  studentSocket.on("video-error", (errData) => {
+    console.error("\n❌ [STUDENT CLIENT] Received video-error:", errData);
+  });
+
+  console.log("\n--- STUDENT JOINS WEBRTC VIDEO ROOM ---");
+  studentSocket.emit("join-video-room", {
+    bookingId: bookingIdStr,
+    userId: studentIdStr,
+    userName: student.name,
+    userRole: "student"
+  });
+
   // Wait for events to complete
   await new Promise((resolve) => setTimeout(resolve, 3000));
 
@@ -162,9 +182,10 @@ async function runVideoCallSignalingTest() {
   console.log(`1. Tutor Call Ack Received: ${callAckReceived ? 'PASSED' : 'FAILED'}`);
   console.log(`2. Student Received Incoming Call Notification: ${incomingCallReceived ? 'PASSED' : 'FAILED'}`);
   console.log(`3. Tutor Received Call Accepted Notification: ${callAcceptedReceived ? 'PASSED' : 'FAILED'}`);
+  console.log(`4. Student WebRTC Room Join ("Confirmed" status): ${joinVideoRoomSuccess ? 'PASSED' : 'FAILED'}`);
 
-  if (incomingCallReceived && callAckReceived && callAcceptedReceived) {
-    console.log("\n🎉 ALL VIDEO CALL SIGNALING TESTS PASSED CLEANLY!");
+  if (incomingCallReceived && callAckReceived && callAcceptedReceived && joinVideoRoomSuccess) {
+    console.log("\n🎉 ALL VIDEO CALL SIGNALING & ROOM JOIN TESTS PASSED CLEANLY!");
     process.exit(0);
   } else {
     console.error("\n❌ VIDEO CALL TEST FAILED.");

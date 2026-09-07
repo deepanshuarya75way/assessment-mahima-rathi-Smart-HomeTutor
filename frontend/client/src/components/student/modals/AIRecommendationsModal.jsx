@@ -52,7 +52,7 @@ export const AIRecommendationsModal = ({ isOpen, onClose, tutors, onBookTutor, c
                       style={{ fontSize: '12px', padding: '6px 14px', opacity: 0.7, cursor: 'not-allowed', background: '#e2e8f0', color: '#64748b', borderColor: '#cbd5e1' }}
                       title="You have already attended a demo class with this tutor. You can book Regular Classes instead."
                     >
-                      Demo Completed ✓
+                      Demo Completed
                     </button>
                   ) : (
                     <button

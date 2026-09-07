@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Header } from '../../components/common/Header';
-import { Footer } from '../../components/common/Footer';
 import { ParentSidebar } from '../../components/dashboard/parent/ParentSidebar';
 import { ParentStats } from '../../components/dashboard/parent/ParentStats';
 import { LinkedChildren } from '../../components/dashboard/parent/LinkedChildren';
@@ -48,6 +46,21 @@ export const ParentDashboard = () => {
   // Guard / Auth check
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const messageParam = params.get('message');
+    if (errorParam || messageParam) {
+      const msg = errorParam || messageParam;
+      if (window.showCustomAlert) {
+        window.showCustomAlert(msg, errorParam ? 'Access Denied' : 'Notification', errorParam ? 'error' : 'info');
+      }
+      params.delete('error');
+      params.delete('message');
+      const newSearch = params.toString();
+      const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
   }, []);
 
   const fetchUnreadCount = async () => {
@@ -133,16 +146,13 @@ export const ParentDashboard = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="parent-dashboard-page">
-      <Header activePage="dashboard" />
-
-      <div className="dashboard-wrapper">
-        {/* MOBILE BACKDROP OVERLAY */}
-        <div
-          className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`}
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden="true"
-        />
+    <div className="dashboard-wrapper">
+      {/* MOBILE BACKDROP OVERLAY */}
+      <div
+        className={`sidebar-overlay ${isMobileMenuOpen ? 'active' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-hidden="true"
+      />
 
         {/* SIDEBAR */}
         <ParentSidebar
@@ -160,8 +170,8 @@ export const ParentDashboard = () => {
         {/* MAIN DASHBOARD CONTENT */}
         <main className="dashboard-main">
           {/* HEADER BAR */}
-          <div className="dashboard-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="dashboard-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 300px', minWidth: 0 }}>
               <button
                 type="button"
                 className="mobile-hamburger-btn"
@@ -180,7 +190,25 @@ export const ParentDashboard = () => {
                 </p>
               </div>
             </div>
-            <div className="dashboard-actions">
+            <div className="dashboard-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto', flexShrink: 0 }}>
+              <button
+                type="button"
+                className="dash-btn dash-btn-outline"
+                onClick={() => setIsAddChildOpen(true)}
+                title="Link a new student account to your parent portal"
+                style={{ fontSize: '13px' }}
+              >
+                <i className="fa-solid fa-user-plus" style={{ color: '#7e22ce' }}></i> Add Child Profile
+              </button>
+              <button
+                type="button"
+                className="dash-btn dash-btn-primary"
+                style={{ background: '#7e22ce', borderColor: '#7e22ce', fontSize: '13px' }}
+                onClick={() => setIsCertificatesOpen(true)}
+                title="View certificates earned by your linked children"
+              >
+                <i className="fa-solid fa-award"></i> View Certificates
+              </button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f3e8ff', padding: '6px 14px', borderRadius: '20px', border: '1px solid #d8b4fe' }}>
                 <i className="fa-solid fa-child" style={{ color: '#7e22ce' }}></i>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#7e22ce' }} id="parentActiveChildDisplay">
@@ -190,49 +218,13 @@ export const ParentDashboard = () => {
             </div>
           </div>
 
-          {/* TAB SWITCHER BUTTONS */}
-          <div className="dash-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
-            <button
-              className={`dash-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-              onClick={() => setActiveTab('overview')}
-            >
-              <i className="fa-solid fa-chart-pie"></i> Academic Overview
-            </button>
-            <button
-              className={`dash-tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notifications')}
-            >
-              <i className="fa-solid fa-bell"></i> Notifications
-              {unreadNotificationsCount > 0 && (
-                <span style={{ marginLeft: '6px', background: '#ef4444', color: '#ffffff', fontSize: '10px', padding: '1px 6px', borderRadius: '10px' }}>
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-            <button className="dash-tab-btn" onClick={() => navigate('/find')}>
-              <i className="fa-solid fa-magnifying-glass"></i> Find Tutors
-            </button>
-            <button
-              className={`dash-tab-btn ${activeTab === 'invoices' ? 'active' : ''}`}
-              onClick={() => setActiveTab('invoices')}
-            >
-              <i className="fa-solid fa-file-invoice-dollar"></i> Invoices & Billing
-            </button>
-            <button
-              className={`dash-tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-              onClick={() => setActiveTab('chat')}
-            >
-              <i className="fa-solid fa-comments"></i> Tutor Chat
-            </button>
-          </div>
-
-          {/* STATS GRID */}
-          <ParentStats stats={stats} />
-
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
-            <div className="dash-tab-content" style={{ display: 'block', marginTop: '24px' }}>
-              <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: '20px' }}>
+            <div className="dash-tab-content" style={{ display: 'block' }}>
+              {/* STATS GRID */}
+              <ParentStats stats={stats} />
+
+              <div className="dash-content-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: '20px', marginTop: '24px' }}>
                 <div>
                   {/* LINKED CHILDREN */}
                   <LinkedChildren
@@ -322,21 +314,18 @@ export const ParentDashboard = () => {
             </div>
           )}
         </main>
+
+        {/* MODALS */}
+        <AddChildModal
+          isOpen={isAddChildOpen}
+          onClose={() => setIsAddChildOpen(false)}
+          onSuccess={fetchDashboardStats}
+        />
+
+        <ParentCertificatesModal
+          isOpen={isCertificatesOpen}
+          onClose={() => setIsCertificatesOpen(false)}
+        />
       </div>
-
-      {/* MODALS */}
-      <AddChildModal
-        isOpen={isAddChildOpen}
-        onClose={() => setIsAddChildOpen(false)}
-        onSuccess={fetchDashboardStats}
-      />
-
-      <ParentCertificatesModal
-        isOpen={isCertificatesOpen}
-        onClose={() => setIsCertificatesOpen(false)}
-      />
-
-      <Footer />
-    </div>
-  );
+    );
 };

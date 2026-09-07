@@ -249,68 +249,19 @@ app.get(["/", "/about", "/privacy-policy", "/terms-of-service", "/forgot-passwor
 });
 
 app.get("/subjects", (req, res) => {
-  res.render("subjects");
+  res.render("index");
 });
 
 app.get("/subjects/:subjectSlug", (req, res) => {
-  const subjectMap = {
-    "mathematics": {
-      title: "Mathematics Tuition",
-      tagline: "Master Algebra, Calculus, Geometry, and Board Exam Problem Solving",
-      icon: "fa-calculator",
-      description: "Comprehensive home and online tutoring for CBSE, ICSE, State, and IB Mathematics across all grades (Class 1 to 12 & Competitive Foundation).",
-      topics: ["Algebra & Trigonometry", "Calculus & Derivatives", "Geometry & Mensuration", "Statistics & Probability", "Board Exam Special Preparation"],
-      grades: "Class 1 to 12 & Competitive Coaching"
-    },
-    "science": {
-      title: "Science & STEM Tuition",
-      tagline: "Explore Physics, Chemistry, Biology with Conceptual Clarity",
-      icon: "fa-flask-vial",
-      description: "Hands-on, concept-driven learning for Physics, Chemistry, and Biology tailored for Board Exams (CBSE/ICSE) and Foundation Olympiads.",
-      topics: ["Physics Mechanics & Electricity", "Organic & Inorganic Chemistry", "Cell Biology & Genetics", "Environmental Science & Lab Practical Guidance"],
-      grades: "Class 6 to 12 Specializations"
-    },
-    "languages": {
-      title: "Languages & Communication",
-      tagline: "English, Hindi, French, Sanskrit & Regional Language Excellence",
-      icon: "fa-language",
-      description: "Interactive language tutoring focused on grammar, vocabulary, reading comprehension, essay writing, and verbal fluency.",
-      topics: ["English Literature & Grammar", "Hindi Vyakaran & Sahitya", "French & Foreign Languages", "Sanskrit & Regional Languages"],
-      grades: "All Grades & Spoken Language Training"
-    },
-    "test-prep": {
-      title: "Test Preparation & Entrance Exams",
-      tagline: "JEE, NEET, Olympiads, CUET & Board Exam Intensive Coaching",
-      icon: "fa-award",
-      description: "Targeted competitive entrance exam strategy, mock test series, speed techniques, and time management coaching.",
-      topics: ["JEE Main & Advanced Coaching", "NEET Medical Preparation", "CUET & University Entrances", "NTSE, Olympiads & Foundation Prep"],
-      grades: "Class 8 to 12 & Dropper Batches"
-    }
-  };
-
-  const slug = req.params.subjectSlug.toLowerCase();
-  const subjectData = subjectMap[slug] || {
-    title: req.params.subjectSlug.toUpperCase() + " Tuition",
-    tagline: "Personalized Home & Online Tutoring",
-    icon: "fa-book-open",
-    description: "Expert home and online tutors for " + req.params.subjectSlug + ".",
-    topics: ["Curriculum Coverage", "Exam Preparation", "Homework & Doubts"],
-    grades: "Class 1 to 12"
-  };
-
-  res.render("subject-detail", { subject: subjectData, slug });
+  res.render("index");
 });
 
 app.get("/contact", (req, res) => {
-  res.render("contact");
+  res.render("index");
 });
 
 app.get("/verify-otp", (req, res) => {
-  res.render("verify-otp", {
-    email: req.query.email || "",
-    message: req.query.message || "",
-    error: req.query.error || ""
-  });
+  res.render("index");
 });
 
 // DASHBOARD HUB & DASHBOARD PANEL ROUTES
@@ -343,12 +294,14 @@ app.use((req, res) => {
 });
 const seedAdminAccount = require("./utils/seedAdmin");
 const { initFeeReminderScheduler } = require("./utils/feeReminderScheduler");
+const { initClassReminderScheduler } = require("./utils/classReminderScheduler");
 
 const startServer = async () => {
   try {
     await connectDB();
     await seedAdminAccount();
     initFeeReminderScheduler(app);
+    initClassReminderScheduler(app);
 
     server.listen(PORT, () => {
       console.log(`✅ Server running at http://localhost:${PORT}`);

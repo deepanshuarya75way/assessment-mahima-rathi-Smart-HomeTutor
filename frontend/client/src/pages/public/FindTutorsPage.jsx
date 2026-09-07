@@ -47,6 +47,9 @@ export const FindTutorsPage = () => {
   const [minRating, setMinRating] = useState('0');
   const [language, setLanguage] = useState('all');
 
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [customCityOption, setCustomCityOption] = useState(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gParam = params.get('grade');
@@ -69,6 +72,38 @@ export const FindTutorsPage = () => {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const reverseGeocodeCity = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        const cityName = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district;
+        if (cityName) return cityName.trim();
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    try {
+      const res2 = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+      );
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const cityName = data2.city || data2.locality;
+        if (cityName) return cityName.trim();
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    return null;
   };
 
   const fetchTutors = useCallback(async () => {
@@ -139,34 +174,73 @@ export const FindTutorsPage = () => {
   }, [fetchTutors]);
 
   const useCurrentGPSLocation = () => {
+    if (isDetectingLocation) return;
+
     if (!navigator.geolocation) {
-      alert('⚠️ Geolocation is not supported by your browser.');
+      showToast('Your browser does not support location services.');
       return;
     }
+
+    setIsDetectingLocation(true);
+    showToast('Detecting your location...');
 
     if (distanceRadius === 'all') {
       setDistanceRadius('10km');
     }
 
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const coords = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
         setUserGeoLocation(coords);
-        showToast('📍 Current location acquired! Searching nearby tutors...');
+
+        const detectedCity = await reverseGeocodeCity(coords.lat, coords.lng);
+        if (detectedCity) {
+          setCustomCityOption(detectedCity);
+          setLocation(detectedCity);
+          showToast(`Current location acquired (${detectedCity})! Searching nearby tutors...`);
+        } else {
+          showToast('Location detected, but city name could not be identified.');
+        }
+
+        setIsDetectingLocation(false);
       },
       (err) => {
+        setIsDetectingLocation(false);
         console.error('GPS Error:', err);
-        alert('⚠️ Unable to retrieve your GPS location. Please check browser location permissions.');
-      }
+        if (err.code === err.PERMISSION_DENIED) {
+          showToast('Location permission was denied. Please allow location access to find nearby tutors.');
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          showToast('Unable to determine your current location. Please try again.');
+        } else if (err.code === err.TIMEOUT) {
+          showToast('Location request timed out. Please try again.');
+        } else {
+          showToast('Unable to retrieve your current location. Please try again.');
+        }
+      },
+      options
     );
+  };
+
+  const handleDistanceRadiusChange = (val) => {
+    setDistanceRadius(val);
+    if (val !== 'all' && !userGeoLocation) {
+      useCurrentGPSLocation();
+    }
   };
 
   const resetFilters = () => {
     setSearchText('');
     setLocation('all');
+    setCustomCityOption(null);
     setSubject('all');
     setBoard('all');
     setGrade('all');
@@ -178,7 +252,10 @@ export const FindTutorsPage = () => {
     setMinRating('0');
     setLanguage('all');
     setUserGeoLocation(null);
-    showToast('🔄 Filters reset to defaults.');
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    showToast('Filters reset to defaults.');
   };
 
   const openGoogleMap = (lat, lng, name) => {
@@ -212,9 +289,9 @@ export const FindTutorsPage = () => {
       const data = await res.json();
       if (data.success) {
         if (window.showCustomAlert) {
-          window.showCustomAlert('🎉 ' + data.message, 'Success', 'success');
+          window.showCustomAlert(data.message, 'Success', 'success');
         } else {
-          alert('🎉 ' + data.message);
+          alert(data.message);
         }
       } else {
         const errorMsg = data.message || 'Authentication required. Please log in.';
@@ -227,7 +304,7 @@ export const FindTutorsPage = () => {
             isAuthError ? () => navigate('/login') : undefined
           );
         } else {
-          alert('⚠️ ' + errorMsg);
+          alert(errorMsg);
           if (isAuthError) navigate('/login');
         }
       }
@@ -237,7 +314,7 @@ export const FindTutorsPage = () => {
       if (window.showCustomAlert) {
         window.showCustomAlert(errorMsg, 'Attention Needed', 'error');
       } else {
-        alert('❌ ' + errorMsg);
+        alert(errorMsg);
       }
     }
   };
@@ -307,8 +384,17 @@ export const FindTutorsPage = () => {
                   type="button"
                   className="ft-btn ft-btn-outline ft-btn-gps"
                   onClick={useCurrentGPSLocation}
+                  disabled={isDetectingLocation}
                 >
-                  <i className="fa-solid fa-location-crosshairs"></i> Use My Current Location
+                  {isDetectingLocation ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin"></i> Detecting location...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-location-crosshairs"></i> Use My Current Location
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -343,10 +429,18 @@ export const FindTutorsPage = () => {
                 <label className="ft-filter-label">Location / City</label>
                 <select className="ft-filter-input" value={location} onChange={(e) => setLocation(e.target.value)}>
                   <option value="all">All Locations / Cities</option>
+                  {customCityOption && !['Delhi', 'New Delhi', 'Mumbai', 'Bangalore', 'Dehradun', 'Kolkata', 'Pune', 'Hyderabad', 'Online'].some((c) => c.toLowerCase() === customCityOption.toLowerCase()) && (
+                    <option value={customCityOption}>{customCityOption}</option>
+                  )}
+                  <option value="Delhi">Delhi / NCR</option>
                   <option value="New Delhi">New Delhi</option>
                   <option value="Mumbai">Mumbai</option>
                   <option value="Bangalore">Bangalore</option>
-                  <option value="Online">Online</option>
+                  <option value="Dehradun">Dehradun</option>
+                  <option value="Kolkata">Kolkata</option>
+                  <option value="Pune">Pune</option>
+                  <option value="Hyderabad">Hyderabad</option>
+                  <option value="Online">Online Only</option>
                 </select>
               </div>
 
@@ -399,16 +493,15 @@ export const FindTutorsPage = () => {
               <div className="ft-filter-field">
                 <label className="ft-filter-label">Teaching Mode</label>
                 <select className="ft-filter-input" value={mode} onChange={(e) => setMode(e.target.value)}>
-                  <option value="all">Online & Home Tuition</option>
-                  <option value="Online">Online Only</option>
-                  <option value="Home">Home Tuition (Offline)</option>
-                  <option value="Both">Both Online & Home</option>
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                  <option value="Both">Both</option>
                 </select>
               </div>
 
               <div className="ft-filter-field">
                 <label className="ft-filter-label">GPS Distance Radius</label>
-                <select className="ft-filter-input" value={distanceRadius} onChange={(e) => setDistanceRadius(e.target.value)}>
+                <select className="ft-filter-input" value={distanceRadius} onChange={(e) => handleDistanceRadiusChange(e.target.value)}>
                   <option value="all">Any Distance Radius</option>
                   <option value="5km">Within &lt; 5 km (Nearby)</option>
                   <option value="10km">Within &lt; 10 km</option>
@@ -450,8 +543,8 @@ export const FindTutorsPage = () => {
                 <label className="ft-filter-label">Min Rating</label>
                 <select className="ft-filter-input" value={minRating} onChange={(e) => setMinRating(e.target.value)}>
                   <option value="0">Any Rating</option>
-                  <option value="4.5">4.5+ ⭐</option>
-                  <option value="4.8">4.8+ ⭐</option>
+                  <option value="4.5">4.5+ Stars</option>
+                  <option value="4.8">4.8+ Stars</option>
                 </select>
               </div>
 
@@ -579,7 +672,7 @@ export const FindTutorsPage = () => {
                             style={{ opacity: 0.7, cursor: 'not-allowed', background: '#f1f5f9', color: '#64748b', borderColor: '#cbd5e1' }}
                             title="You have already attended a demo class with this tutor. You can book Regular Classes instead."
                           >
-                            <i className="fa-solid fa-circle-check"></i> Demo Completed ✓
+                            <i className="fa-solid fa-circle-check"></i> Demo Completed
                           </button>
                         ) : (
                           <button

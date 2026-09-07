@@ -51,10 +51,20 @@ export const FindTutorsTab = ({ onBookTutor, onRegularClass }) => {
 
   useEffect(() => {
     loadTutors();
-  }, [filters.subject, filters.board, filters.grade, filters.radius, filters.lat, filters.lng]);
+  }, [filters.subject, filters.board, filters.grade, filters.location, filters.radius, filters.lat, filters.lng]);
 
   const handleFilterChange = (field, value) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => {
+      const updated = { ...prev, [field]: value };
+      if (field === 'location' && prev.lat !== null) {
+        updated.lat = null;
+        updated.lng = null;
+      }
+      return updated;
+    });
+    if (field === 'radius' && value !== 'all' && filters.lat === null) {
+      acquireGPS();
+    }
   };
 
   const handleReset = () => {
@@ -71,19 +81,52 @@ export const FindTutorsTab = ({ onBookTutor, onRegularClass }) => {
     });
   };
 
+  const reverseGeocodeCity = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const addr = data.address || {};
+        const cityName = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district;
+        if (cityName) return cityName.trim();
+      }
+    } catch (e) {}
+
+    try {
+      const res2 = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+      );
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const cityName = data2.city || data2.locality;
+        if (cityName) return cityName.trim();
+      }
+    } catch (e) {}
+
+    return '';
+  };
+
   const acquireGPS = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const detectedCity = await reverseGeocodeCity(lat, lng);
+
           setFilters((prev) => ({
             ...prev,
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            radius: '10km',
+            lat,
+            lng,
+            radius: prev.radius && prev.radius !== 'all' ? prev.radius : '10km',
+            location: detectedCity || prev.location,
           }));
         },
         (err) => {
-          alert('Geolocation error: ' + err.message);
+          alert('Geolocation error: ' + err.message + '\nPlease check location permissions in your browser.');
         }
       );
     } else {
@@ -231,12 +274,18 @@ export const FindTutorsTab = ({ onBookTutor, onRegularClass }) => {
                   </div>
 
                   <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.5 }}>
-                    <i className="fa-solid fa-location-dot" style={{ color: '#ef4444' }}></i> {tutor.location || 'Online'} &bull; <i className="fa-solid fa-star" style={{ color: '#f59e0b' }}></i> {tutor.rating || 5.0} ({tutor.totalReviews || 0} reviews)
+                    <i className="fa-solid fa-location-dot" style={{ color: '#ef4444' }}></i> {tutor.location || 'Online'}
+                    {typeof tutor.distanceKm === 'number' && (
+                      <span style={{ marginLeft: '6px', color: '#0284c7', fontWeight: 700 }}>
+                        &bull; <i className="fa-solid fa-location-crosshairs"></i> {tutor.distanceKm} km
+                      </span>
+                    )}{' '}
+                    &bull; <i className="fa-solid fa-star" style={{ color: '#f59e0b' }}></i> {tutor.rating || 5.0} ({tutor.totalReviews || 0} reviews)
                   </p>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f2a4a' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f2a4a',whiteSpace: 'nowrap',flexShrink: 0 }}>
                     ₹{tutor.fee || 500}<small style={{ fontSize: '11px', fontWeight: 400, color: '#64748b' }}>/hr</small>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -249,7 +298,7 @@ export const FindTutorsTab = ({ onBookTutor, onRegularClass }) => {
                         return (
                           <div style={{ width: '100%', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <div style={{ fontSize: '11px', color: '#166534', background: '#dcfce7', border: '1px solid #86efac', padding: '6px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                              ✓ You have already taken the demo class. Book a regular class to continue.
+                              You have already taken the demo class. Book a regular class to continue.
                             </div>
                             <button
                               type="button"

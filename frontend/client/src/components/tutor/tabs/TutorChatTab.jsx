@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FiPaperclip, FiX } from 'react-icons/fi';
 
 export const TutorChatTab = ({ currentUserId, currentUserName }) => {
   const [conversations, setConversations] = useState([]);
@@ -372,7 +373,7 @@ export const TutorChatTab = ({ currentUserId, currentUserName }) => {
                       </span>
                     ) : (
                       <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <i className="fa-solid fa-comments"></i> 💬 Chat Unlocked
+                        <i className="fa-solid fa-comments"></i> Chat Unlocked
                       </span>
                     )}
                     <button className="dash-btn dash-btn-primary" onClick={triggerVideoCall}>
@@ -452,8 +453,8 @@ export const TutorChatTab = ({ currentUserId, currentUserName }) => {
                       {m.content && <div>{m.content}</div>}
                       {m.fileUrl && (
                         <div style={{ marginTop: '6px', fontSize: '12px' }}>
-                          <a href={m.fileUrl} target="_blank" rel="noreferrer" style={{ color: isMe ? '#38bdf8' : '#0284c7', textDecoration: 'underline' }}>
-                            📎 {m.fileName || 'Attachment'}
+                          <a href={m.fileUrl} target="_blank" rel="noreferrer" style={{ color: isMe ? '#38bdf8' : '#0284c7', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <FiPaperclip /> {m.fileName || 'Attachment'}
                           </a>
                         </div>
                       )}
@@ -470,19 +471,19 @@ export const TutorChatTab = ({ currentUserId, currentUserName }) => {
             {/* PENDING FILE PREVIEW BANNER */}
             {pendingFile && !isChatLocked && (
               <div style={{ padding: '8px 16px', background: '#e0f2fe', borderTop: '1px solid #bae6fd', fontSize: '12px', display: 'flex', justifyContent: 'space-between', color: '#0369a1' }}>
-                <span>📎 Ready to send: <strong>{pendingFile.fileName}</strong></span>
-                <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}>✕ Cancel</button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiPaperclip /> Ready to send: <strong>{pendingFile.fileName}</strong></span>
+                <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiX /> Cancel</button>
               </div>
             )}
 
             <div className="chat-footer">
               <label className="dash-btn dash-btn-outline" style={{ padding: '10px 14px', cursor: (activeStudentId && !isChatLocked) ? 'pointer' : 'not-allowed', opacity: (activeStudentId && !isChatLocked) ? 1 : 0.5 }}>
-                <i className="fa-solid fa-paperclip"></i>
+                <FiPaperclip />
                 <input type="file" accept="image/*,.pdf,.doc,.docx" style={{ display: 'none' }} disabled={!activeStudentId || isChatLocked || uploadingFile} onChange={handleFileUpload} />
               </label>
               <input
                 type="text"
-                placeholder={isChatLocked ? '🔒 Chat will be available after the tutor completes the payment.' : 'Type message...'}
+                placeholder={isChatLocked ? 'Chat will be available after the tutor completes the payment.' : 'Type message...'}
                 value={messageInput}
                 disabled={!activeStudentId || isChatLocked}
                 onChange={handleTyping}

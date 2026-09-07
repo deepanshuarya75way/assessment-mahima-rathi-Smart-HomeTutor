@@ -19,14 +19,14 @@ export const ParentInvoices = ({ invoices = [], onInvoicePaid }) => {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setMessage(`✅ ${data.message || 'Payment completed successfully!'}`);
+        setMessage(`${data.message || 'Payment completed successfully!'}`);
         if (onInvoicePaid) onInvoicePaid();
       } else {
-        setMessage(`❌ ${data.message || 'Payment failed. Please try again.'}`);
+        setMessage(`${data.message || 'Payment failed. Please try again.'}`);
       }
     } catch (err) {
       console.error('Pay invoice error:', err);
-      setMessage('❌ Network error processing payment.');
+      setMessage('Network error processing payment.');
     } finally {
       setLoadingId(null);
       setTimeout(() => setMessage(''), 4000);

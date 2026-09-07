@@ -69,7 +69,7 @@ const classScheduleSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Scheduled", "Completed", "Cancelled", "Rescheduled"],
+      enum: ["Scheduled", "Completed", "Cancelled", "Rescheduled", "Discontinued"],
       default: "Scheduled",
     },
     attendance: {
@@ -77,10 +77,23 @@ const classScheduleSchema = new mongoose.Schema(
       enum: ["Pending", "Present", "Absent", "Late"],
       default: "Pending",
     },
+    remindedToday: {
+      type: Boolean,
+      default: false,
+    },
+    remindedOneHour: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// Indexes for schedule & calendar performance
+classScheduleSchema.index({ student: 1, status: 1 });
+classScheduleSchema.index({ tutor: 1, status: 1 });
+classScheduleSchema.index({ date: 1 });
 
 module.exports = mongoose.model("ClassSchedule", classScheduleSchema);

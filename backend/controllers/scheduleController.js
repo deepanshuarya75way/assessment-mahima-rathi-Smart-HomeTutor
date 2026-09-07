@@ -70,10 +70,15 @@ exports.createClassSchedule = async (req, res) => {
   }
 };
 
+const { processClassRemindersAndTransitions } = require("../utils/classReminderScheduler");
+
 exports.getSchedules = async (req, res) => {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
+
+    // Trigger auto-transition check so returned schedules are strictly up-to-date
+    await processClassRemindersAndTransitions(req.app).catch(() => {});
     
     let filter = {};
     if (userRole === "tutor") {

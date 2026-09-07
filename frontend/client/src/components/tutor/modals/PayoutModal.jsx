@@ -33,7 +33,7 @@ export const PayoutModal = ({ isOpen, onClose, availableBalance = 0, onSuccess }
     try {
       const res = await tutorApi.requestPayout(numericAmount, upiId.trim());
       if (res.success) {
-        setSuccess('✅ Payout request submitted successfully! Funds will be transferred to your account within 24 hours.');
+        setSuccess('Payout request submitted successfully! Funds will be transferred to your account within 24 hours.');
         if (onSuccess) onSuccess();
         setTimeout(() => {
           onClose();

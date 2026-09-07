@@ -75,6 +75,82 @@ const createNotification = async ({ userId, role, title, message, type = "system
       console.warn("Web Push notification error:", pushErr.message);
     }
 
+    // 3. Automatic Parent Notification Routing for Fee/Payment Notifications
+    if (
+      userRole === "student" &&
+      (
+        ["fee", "payment", "invoice"].includes(type) ||
+        /fee|payment|tuition|invoice|due/i.test(title || "") ||
+        /fee|payment|tuition|invoice|due/i.test(message || "")
+      )
+    ) {
+      try {
+        const ChildProfile = require("../models/ChildProfile");
+        const studentUser = await User.findById(userId).select("name email");
+        if (studentUser) {
+          const studentName = studentUser.name || "Student";
+          const cleanEmail = studentUser.email ? studentUser.email.toLowerCase().trim() : "";
+
+          const childLinks = await ChildProfile.find({
+            $or: [
+              { student: userId },
+              ...(cleanEmail ? [{ email: cleanEmail }] : []),
+            ],
+          }).select("parent");
+
+          const notifiedParents = new Set();
+
+          for (const link of childLinks) {
+            if (!link.parent) continue;
+            const parentIdStr = link.parent.toString();
+            if (parentIdStr === userId.toString() || notifiedParents.has(parentIdStr)) continue;
+            notifiedParents.add(parentIdStr);
+
+            // Construct personalized parent message if not already containing student's name
+            let parentMsg = message;
+            if (!message.toLowerCase().includes(studentName.toLowerCase())) {
+              parentMsg = `Notification regarding ${studentName}: ${message}`;
+            }
+
+            // 5-minute duplicate guard for parent notification
+            const existingParentNotif = await Notification.findOne({
+              user: link.parent,
+              title,
+              message: parentMsg,
+              createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) },
+            });
+
+            if (!existingParentNotif) {
+              const parentNotifDoc = await Notification.create({
+                user: link.parent,
+                role: "parent",
+                title,
+                message: parentMsg,
+                type: type === "fee" || type === "payment" ? type : "fee",
+                actionUrl: "/dashboard/parent?tab=invoices",
+                isRead: false,
+                read: false,
+              });
+
+              // Socket.IO Real-Time Notification to Parent
+              if (app && typeof app.get === 'function') {
+                const io = app.get("io");
+                const onlineUsers = app.get("onlineUsers");
+                if (io && onlineUsers) {
+                  const parentSocketId = onlineUsers.get(parentIdStr);
+                  if (parentSocketId) {
+                    io.to(parentSocketId).emit("receiveNotification", parentNotifDoc);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (parentErr) {
+        console.warn("Parent fee notification routing notice:", parentErr.message);
+      }
+    }
+
     return notificationDoc;
   } catch (err) {
     console.error("Create Notification Helper Error:", err);
@@ -133,17 +209,17 @@ const createAdminNotification = async ({
 
         createdNotifications.push(notif);
 
-        // Real-Time Socket.IO Broadcast to Admin Room & Sockets
+        // Real-Time Socket.IO Dispatch strictly to authenticated Admin accounts
         if (app && typeof app.get === 'function') {
           const io = app.get("io");
           if (io) {
-            io.to("admin").emit("receiveNotification", notif);
-            io.to("admin").emit("receiveAdminNotification", notif);
-            io.emit("receiveAdminNotification", notif);
+            const adminIdStr = admin._id.toString();
+            io.to(adminIdStr).emit("receiveNotification", notif);
+            io.to(adminIdStr).emit("receiveAdminNotification", notif);
 
             const onlineUsers = app.get("onlineUsers");
             if (onlineUsers) {
-              const socketId = onlineUsers.get(admin._id.toString());
+              const socketId = onlineUsers.get(adminIdStr);
               if (socketId) {
                 io.to(socketId).emit("receiveNotification", notif);
                 io.to(socketId).emit("receiveAdminNotification", notif);
