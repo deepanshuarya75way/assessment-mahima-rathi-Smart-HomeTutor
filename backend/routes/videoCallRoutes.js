@@ -13,5 +13,7 @@ const { requireAuth } = require("../middleware/authMiddleware");
 // JSON API Endpoints
 router.get("/details/:bookingId", requireAuth, videoCallController.getVideoCallDetails);
 router.get("/status/:bookingId", requireAuth, videoCallController.getVideoCallStatus);
+router.post("/complete/:bookingId", requireAuth, videoCallController.completeVideoCall);
 
 module.exports = router;
+

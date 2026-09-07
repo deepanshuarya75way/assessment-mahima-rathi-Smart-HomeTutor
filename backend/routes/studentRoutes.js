@@ -53,6 +53,7 @@ router.get("/class-schedule", requireAuth, authorizeRole("student"), studentCont
 // Settings: Edit Profile, Change Password, Discontinue Classes
 router.put("/profile", requireAuth, authorizeRole("student"), studentController.updateProfile);
 router.patch("/change-password", requireAuth, authorizeRole("student"), studentController.changePassword);
+router.get("/discontinue-preview", requireAuth, authorizeRole("student"), studentController.getDiscontinuePreview);
 router.post("/discontinue-class", requireAuth, authorizeRole("student"), studentController.discontinueClass);
 router.patch("/discontinue-account", requireAuth, authorizeRole("student"), studentController.discontinueClass);
 

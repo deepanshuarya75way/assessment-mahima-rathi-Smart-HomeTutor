@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiMail, FiPhone } from 'react-icons/fi';
+import { checkClassJoinable } from '../../../utils/classTimeHelper';
 
 export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectRequest }) => {
   return (
@@ -16,8 +17,8 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
             <thead>
               <tr>
                 <th>STUDENT DETAILS</th>
-                <th>SUBJECT & REQUIREMENTS</th>
-                <th>REQUEST DATE</th>
+                <th>SUBJECT & TYPE</th>
+                <th>SCHEDULED DATE & TIME</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
@@ -40,6 +41,15 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                   const isConfirmed = req.status === 'Confirmed' || req.status === 'Accepted';
                   const isRejectedByTutor = req.status === 'Rejected by Tutor';
 
+                  const demoDateStr = req.scheduledDate
+                    ? new Date(req.scheduledDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                    : req.date || new Date(req.createdAt || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' });
+                  const demoTimeStr = req.scheduledStartTime || req.scheduledTime || req.time || '06:00 PM';
+
+                  const timingStatus = isConfirmed
+                    ? checkClassJoinable(req.scheduledDate || req.date, req.scheduledStartTime, req.scheduledEndTime, req.status)
+                    : null;
+
                   return (
                     <tr key={req._id}>
                       <td>
@@ -48,9 +58,14 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                         {studentPhone !== 'N/A' && <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}><FiPhone size={12} /> {studentPhone}</div>}
                       </td>
                       <td>
-                        <div style={{ fontWeight: '700', color: '#0f172a' }}>{subjectName}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: '700', color: '#0f172a' }}>{subjectName}</span>
+                          <span style={{ fontSize: '10px', background: '#e0f2fe', color: '#0284c7', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                            One-Time Demo
+                          </span>
+                        </div>
                         <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
-                          {req.isHomeVisit ? ' Home Visit Tuition' : ' Online Live Class'}
+                          {req.isHomeVisit ? ' Home Visit Tuition' : ' Online Live Class'} &bull; Grade: {req.grade || req.class || 'General'}
                         </div>
                         {req.message && (
                           <div style={{ fontSize: '12px', color: '#64748b', fontStyle: 'italic', marginTop: '4px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px' }}>
@@ -59,12 +74,12 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                         )}
                       </td>
                       <td>
-                        <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
-                          {new Date(req.createdAt || Date.now()).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f2a4a' }}>
+                          {demoDateStr}
                         </div>
-                        <small style={{ color: '#64748b' }}>
-                          {new Date(req.createdAt || Date.now()).toLocaleTimeString('en-IN', { timeStyle: 'short' })}
-                        </small>
+                        <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600' }}>
+                          <i className="fa-regular fa-clock"></i> {demoTimeStr}
+                        </div>
                       </td>
                       <td>
                         <span
@@ -77,9 +92,9 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                           }`}
                         >
                           {isConfirmed
-                            ? 'Confirmed'
+                            ? 'Confirmed Demo'
                             : isPendingAcceptance
-                            ? 'Pending Your Action'
+                            ? 'Pending Acceptance'
                             : isRejectedByTutor
                             ? 'Declined by You'
                             : req.status}
@@ -103,7 +118,7 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                               }}
                               onClick={() => onAcceptRequest && onAcceptRequest(req._id)}
                             >
-                              <i className="fa-solid fa-check"></i> Accept Demo Class
+                              <i className="fa-solid fa-check"></i> Accept Demo
                             </button>
                             <button
                               type="button"
@@ -124,9 +139,44 @@ export const TutorRequestsTab = ({ requests = [], onAcceptRequest, onRejectReque
                             </button>
                           </div>
                         ) : isConfirmed ? (
-                          <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '700' }}>
-                            <i className="fa-solid fa-circle-check"></i> Class Confirmed
-                          </span>
+                          timingStatus && timingStatus.canJoin ? (
+                            <button
+                              type="button"
+                              className="dash-btn dash-btn-primary"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                borderRadius: '8px',
+                                background: '#0284c7',
+                                borderColor: '#0284c7',
+                              }}
+                              onClick={() => {
+                                window.location.href = `/video-call/${req.scheduleId || req._id}`;
+                              }}
+                            >
+                              <i className="fa-solid fa-video"></i> Start Demo
+                            </button>
+                          ) : (
+                            <span
+                              style={{
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                padding: '5px 10px',
+                                borderRadius: '8px',
+                                fontSize: '11.5px',
+                                fontWeight: '700',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                border: '1px solid #e2e8f0',
+                              }}
+                              title={timingStatus ? timingStatus.actionNote : 'Scheduled'}
+                            >
+                              <i className="fa-regular fa-clock" style={{ color: '#0284c7' }}></i>
+                              {timingStatus ? timingStatus.actionNote : 'Scheduled'}
+                            </span>
+                          )
                         ) : (
                           <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: '700' }}>
                             <i className="fa-solid fa-circle-xmark"></i> Request Declined

@@ -19,10 +19,28 @@ const { createNotification, createAdminNotification } = require("../utils/notifi
 const { logUserActivity } = require("../utils/activityLogHelper");
 const referralController = require("./referralController");
 
-
+/**
+ * POST /api/student/book
+ * Book demo class or regular session with a tutor
+ */
 exports.bookTutor = async (req, res) => {
   try {
-    const { tutorProfileId, message, address, lat, lng, isHomeVisit, isTrial } = req.body;
+    const {
+      tutorProfileId,
+      message,
+      address,
+      lat,
+      lng,
+      isHomeVisit,
+      isTrial,
+      scheduledDate,
+      date,
+      scheduledStartTime,
+      scheduledEndTime,
+      demoSlot,
+      demoDay,
+      subject,
+    } = req.body;
     const student = await User.findById(req.user.id);
 
     if (!student) {
@@ -104,6 +122,44 @@ exports.bookTutor = async (req, res) => {
     }
 
     // Create Demo / Regular Booking Request (Do NOT create class schedule at this stage)
+    const bookingDate = scheduledDate || date ? new Date(scheduledDate || date) : null;
+    let sStart = scheduledStartTime || "18:00";
+    let sEnd = scheduledEndTime || "19:00";
+    if (demoSlot && (!scheduledStartTime || !scheduledEndTime)) {
+      const parts = demoSlot.split(/[-–—]/).map((p) => p.trim());
+      if (parts[0]) sStart = parts[0];
+      if (parts[1]) sEnd = parts[1];
+    }
+
+    // Prevent duplicate booking for same tutor + date + time slot
+    if (bookingDate) {
+      const requestedDateStart = new Date(bookingDate);
+      requestedDateStart.setHours(0, 0, 0, 0);
+      const requestedDateEnd = new Date(bookingDate);
+      requestedDateEnd.setHours(23, 59, 59, 999);
+
+      const existingSlotCollision = await BookingRequest.findOne({
+        tutorProfile: tutorProfile._id,
+        scheduledDate: { $gte: requestedDateStart, $lte: requestedDateEnd },
+        scheduledStartTime: sStart,
+        status: { $nin: ["Rejected", "Rejected by Admin", "Rejected by Tutor", "Cancelled", "Discontinued"] },
+      });
+
+      const existingScheduleCollision = await ClassSchedule.findOne({
+        tutor: tutorProfile.user._id,
+        date: { $gte: requestedDateStart, $lte: requestedDateEnd },
+        startTime: sStart,
+        status: { $nin: ["Cancelled", "Discontinued", "Rejected"] },
+      });
+
+      if (existingSlotCollision || existingScheduleCollision) {
+        return res.status(400).json({
+          success: false,
+          message: `The selected time slot (${sStart}) on this date is already booked with this tutor. Please choose a different date or time slot.`,
+        });
+      }
+    }
+
     const booking = await BookingRequest.create({
       student: student._id,
       tutor: tutorProfile.user._id,
@@ -118,6 +174,13 @@ exports.bookTutor = async (req, res) => {
       homeVisitStatus: isHomeVisit ? "Scheduled" : "N/A",
       isTrial: isTrialRequest,
       classType: isTrialRequest ? "demo" : "regular",
+      date: bookingDate,
+      scheduledDate: bookingDate,
+      scheduledStartTime: sStart,
+      scheduledEndTime: sEnd,
+      demoSlot: demoSlot || (sStart && sEnd ? `${sStart} – ${sEnd}` : ""),
+      demoDay: demoDay || "",
+      subject: subject || tutorProfile.primarySubject || (Array.isArray(tutorProfile.subjects) ? tutorProfile.subjects[0] : "") || "Tuition",
       adminApproved: false,
       tutorApproved: false,
       adminRejected: false,
@@ -1479,9 +1542,162 @@ exports.changePassword = async (req, res) => {
 };
 
 /**
+ * Calculate discontinue summary, fees paid, remaining classes, and refund/adjustment
+ */
+const calculateDiscontinueSummary = async (studentId, tutorId) => {
+  if (!studentId || !tutorId) {
+    return {
+      tutorId: tutorId || "",
+      tutorName: "Tutor",
+      subject: "",
+      totalTuitionFee: 0,
+      totalPaidAmount: 0,
+      isPaid: false,
+      isFullyPaid: false,
+      isPartiallyPaid: false,
+      totalClasses: 0,
+      usedClasses: 0,
+      remainingClasses: 0,
+      refundAmount: 0,
+    };
+  }
+
+  // Resolve target tutor user & tutor profile
+  let targetTutorUser = await User.findById(tutorId).select("name email role");
+  let targetTutorProfile = null;
+
+  if (targetTutorUser && targetTutorUser.role === "tutor") {
+    targetTutorProfile = await TutorProfile.findOne({ user: targetTutorUser._id });
+  } else {
+    targetTutorProfile = await TutorProfile.findById(tutorId).populate("user");
+    if (targetTutorProfile && targetTutorProfile.user) {
+      targetTutorUser = targetTutorProfile.user;
+    }
+  }
+
+  const tutorUserId = targetTutorUser
+    ? targetTutorUser._id
+    : (targetTutorProfile && targetTutorProfile.user ? targetTutorProfile.user._id : tutorId);
+  const tutorProfId = targetTutorProfile ? targetTutorProfile._id : null;
+  const tutorName = targetTutorUser
+    ? targetTutorUser.name
+    : (targetTutorProfile ? targetTutorProfile.fullName : "Tutor");
+
+  let subjectStr = "Regular Classes";
+  if (targetTutorProfile && Array.isArray(targetTutorProfile.subjects) && targetTutorProfile.subjects.length > 0) {
+    subjectStr = targetTutorProfile.subjects.filter(Boolean).join(", ");
+  } else if (targetTutorProfile && targetTutorProfile.specialization) {
+    subjectStr = Array.isArray(targetTutorProfile.specialization)
+      ? targetTutorProfile.specialization.filter(Boolean).join(", ")
+      : String(targetTutorProfile.specialization);
+  }
+
+  // 1. Fee Calculation via calculateTutorFeeSummary
+  const feeSummary = await calculateTutorFeeSummary(studentId, tutorUserId);
+  const totalTuitionFee = feeSummary.totalTuitionFee || 0;
+  const totalPaidAmount = feeSummary.totalPaidAmount || 0;
+  const paymentLeft = feeSummary.paymentLeft || 0;
+
+  const isFullyPaid = totalPaidAmount > 0 && (paymentLeft === 0 || (totalTuitionFee > 0 && totalPaidAmount >= totalTuitionFee));
+  const isPartiallyPaid = totalPaidAmount > 0 && !isFullyPaid;
+  const isPaid = totalPaidAmount > 0;
+
+  // 2. Class & Attendance Schedules
+  const now = new Date();
+  const schedules = await ClassSchedule.find({
+    student: studentId,
+    $or: [
+      { tutor: tutorUserId },
+      ...(tutorProfId ? [{ tutor: tutorProfId }] : [])
+    ],
+    classType: { $ne: "demo" },
+    isTrial: { $ne: true }
+  }).sort({ date: 1 });
+
+  // Completed / used classes (Completed status, marked attendance, or past class)
+  const completedSchedules = schedules.filter((sch) => {
+    if (sch.status === "Completed") return true;
+    if (sch.attendance && ["Present", "Late", "Absent"].includes(sch.attendance)) return true;
+    if (sch.status !== "Cancelled" && sch.status !== "Discontinued" && new Date(sch.date) <= now) return true;
+    return false;
+  });
+  const usedClasses = completedSchedules.length;
+
+  // Upcoming scheduled classes
+  const upcomingSchedules = schedules.filter((sch) => {
+    return sch.status === "Scheduled" && new Date(sch.date) > now;
+  });
+  const upcomingClasses = upcomingSchedules.length;
+
+  // Total package classes
+  let totalClasses = 0;
+  if (usedClasses + upcomingClasses > 0) {
+    totalClasses = usedClasses + upcomingClasses;
+  } else {
+    const hourlyFee = (targetTutorProfile && Number(targetTutorProfile.fee)) || 500;
+    if (totalPaidAmount > 0) {
+      totalClasses = Math.max(1, Math.round(totalPaidAmount / (hourlyFee > 0 ? hourlyFee : 500)));
+    } else if (totalTuitionFee > 0) {
+      totalClasses = Math.max(1, Math.round(totalTuitionFee / (hourlyFee > 0 ? hourlyFee : 500)));
+    } else {
+      totalClasses = 10;
+    }
+  }
+
+  const remainingClasses = Math.max(0, totalClasses - usedClasses);
+
+  // 3. Refund / Adjustment Calculation
+  let refundAmount = 0;
+  if (totalPaidAmount > 0 && totalClasses > 0) {
+    const effectiveClassRate = totalPaidAmount / totalClasses;
+    refundAmount = Math.max(0, Math.round(remainingClasses * effectiveClassRate));
+  }
+
+  return {
+    tutorId: tutorUserId.toString(),
+    tutorName,
+    subject: subjectStr,
+    totalTuitionFee,
+    totalPaidAmount,
+    paymentLeft,
+    isPaid,
+    isFullyPaid,
+    isPartiallyPaid,
+    totalClasses,
+    usedClasses,
+    remainingClasses,
+    refundAmount,
+  };
+};
+
+exports.calculateDiscontinueSummary = calculateDiscontinueSummary;
+
+/**
+ * GET /api/student/discontinue-preview?tutorId=...
+ * Fetch real-time payment status, class usage, and refund/adjustment preview before discontinuing.
+ */
+exports.getDiscontinuePreview = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { tutorId } = req.query;
+
+    if (!tutorId || !mongoose.Types.ObjectId.isValid(tutorId)) {
+      return res.status(400).json({ success: false, message: "Valid tutor ID is required." });
+    }
+
+    const preview = await calculateDiscontinueSummary(studentId, tutorId);
+    return res.status(200).json({ success: true, preview });
+  } catch (err) {
+    console.error("Get Discontinue Preview Error:", err);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
  * POST /api/student/discontinue-class
  * Discontinue regular classes with a specific tutor for logged-in student using req.user.id.
- * Preserves historical records, payments, and student account status.
+ * Checks payment status, calculates remaining unused class refund/adjustment, updates wallet,
+ * preserves all payment and class history, and sends notifications.
  */
 exports.discontinueClass = async (req, res) => {
   try {
@@ -1550,7 +1766,26 @@ exports.discontinueClass = async (req, res) => {
       });
     }
 
-    // 1. Mark active regular booking requests as Discontinued
+    // 1. Calculate Refund / Adjustment for Unused Classes
+    const summary = await calculateDiscontinueSummary(student._id, tutorUserId);
+    const refundAmount = summary.refundAmount || 0;
+    const remainingClasses = summary.remainingClasses || 0;
+
+    // 2. If refund amount > 0, credit student's Smart Wallet and create Transaction record
+    if (refundAmount > 0) {
+      student.walletBalance = (student.walletBalance || 0) + refundAmount;
+      await student.save();
+
+      await Transaction.create({
+        user: student._id,
+        type: "Refund",
+        amount: refundAmount,
+        description: `Refund for ${remainingClasses} unused class(es) upon discontinuing regular classes with tutor ${summary.tutorName}`,
+        status: "Completed",
+      });
+    }
+
+    // 3. Mark active regular booking requests as Discontinued (Preserves historical records)
     await BookingRequest.updateMany(
       {
         student: student._id,
@@ -1564,7 +1799,7 @@ exports.discontinueClass = async (req, res) => {
       { $set: { status: "Discontinued" } }
     );
 
-    // 2. Cancel upcoming scheduled classes for this student and tutor (Keep Completed classes intact)
+    // 4. Cancel ONLY upcoming scheduled classes (Keep Completed classes & attendance intact)
     await ClassSchedule.updateMany(
       {
         student: student._id,
@@ -1574,21 +1809,32 @@ exports.discontinueClass = async (req, res) => {
       { $set: { status: "Cancelled" } }
     );
 
-    // 3. Audit Activity Log & Notifications
-    const tutorName = targetTutorUser.name || "Tutor";
+    // 5. Audit Activity Log & Notifications
+    const tutorName = summary.tutorName || targetTutorUser.name || "Tutor";
     const studentName = student.name || student.email || "Student";
     const reasonText = reason ? ` (Reason: ${reason})` : "";
+    const refundText = refundAmount > 0 ? ` (Refund amount: ₹${refundAmount.toLocaleString("en-IN")})` : "";
 
-    await logUserActivity(student._id, `Discontinued regular classes with tutor ${tutorName}${reasonText}`, req.ip);
+    await logUserActivity(
+      student._id,
+      `Discontinued regular classes with tutor ${tutorName}${reasonText}${refundText}`,
+      req.ip
+    );
+
+    // Student notification
+    const studentNotificationMessage = refundAmount > 0
+      ? `Your regular classes with ${tutorName} have been discontinued. An amount of ₹${refundAmount.toLocaleString("en-IN")} for ${remainingClasses} remaining class(es) has been credited to your Smart Wallet (New Wallet Balance: ₹${student.walletBalance.toLocaleString("en-IN")}).`
+      : `Your regular classes with ${tutorName} have been discontinued. Your account remains active.`;
 
     await createNotification({
       userId: student._id,
-      title: "Regular Classes Discontinued",
-      message: `Your regular classes with ${tutorName} have been discontinued. Your account remains active.`,
+      title: refundAmount > 0 ? "Classes Discontinued & Refund Credited" : "Regular Classes Discontinued",
+      message: studentNotificationMessage,
       type: "class_discontinued",
       app: req.app
     });
 
+    // Tutor notification
     await createNotification({
       userId: tutorUserId,
       title: "Class Discontinuation Notice",
@@ -1597,9 +1843,10 @@ exports.discontinueClass = async (req, res) => {
       app: req.app
     });
 
+    // Admin notification
     await createAdminNotification({
       title: "Regular Class Discontinued",
-      message: `${studentName} discontinued regular classes with ${tutorName}${reasonText}.`,
+      message: `${studentName} discontinued regular classes with ${tutorName}${reasonText}.${refundAmount > 0 ? ` Refund/Credit of ₹${refundAmount.toLocaleString("en-IN")} credited to student wallet.` : ""}`,
       sourceUser: student._id,
       sourceRole: "student",
       type: "class_discontinued",
@@ -1607,9 +1854,16 @@ exports.discontinueClass = async (req, res) => {
       app: req.app
     });
 
+    const responseMsg = refundAmount > 0
+      ? `Regular classes with ${tutorName} have been discontinued. ₹${refundAmount.toLocaleString("en-IN")} has been credited to your Smart Wallet for ${remainingClasses} remaining class(es).`
+      : `Regular classes with ${tutorName} have been discontinued successfully. Your account remains active.`;
+
     return res.status(200).json({
       success: true,
-      message: `Regular classes with ${tutorName} have been discontinued successfully. Your account remains active.`,
+      message: responseMsg,
+      refundAmount,
+      remainingClasses,
+      walletBalance: student.walletBalance,
     });
   } catch (err) {
     console.error("Discontinue Class Error:", err);

@@ -1,32 +1,121 @@
 
 const BookingRequest = require("../models/BookingRequest");
 const ClassSchedule = require("../models/ClassSchedule");
+const { parseScheduleTime, format12HourTime } = require("./classReminderScheduler");
 const activeCalls = new Map();
 const userSockets = new Map();
 
 async function findBookingOrScheduleSocket(bIdStr) {
+  if (!bIdStr) return null;
+  const mongoose = require("mongoose");
+  if (!mongoose.Types.ObjectId.isValid(bIdStr)) return null;
+
   let booking = await BookingRequest.findById(bIdStr)
     .populate("student", "name email role")
     .populate("tutor", "name email role")
-    .populate("tutorProfile", "subjects");
+    .populate({
+      path: "tutorProfile",
+      select: "subjects qualification fee user",
+      populate: { path: "user", select: "name email role" },
+    });
 
-  if (!booking) {
-    const schedule = await ClassSchedule.findById(bIdStr)
-      .populate("student", "name email role")
-      .populate("tutor", "name email role");
+  if (booking) {
+    if (!booking.tutor && booking.tutorProfile?.user) {
+      booking.tutor = booking.tutorProfile.user;
+    }
+    return booking;
+  }
 
-    if (schedule && schedule.student && schedule.tutor) {
-      booking = {
-        _id: schedule._id,
-        student: schedule.student,
-        tutor: schedule.tutor,
-        status: schedule.status === "Cancelled" ? "Rejected" : "Accepted",
-        tutorProfile: { subjects: [schedule.subject] },
+  const schedule = await ClassSchedule.findById(bIdStr)
+    .populate("student", "name email role")
+    .populate("tutor", "name email role");
+
+  if (schedule) {
+    const studentObj = (schedule.student && typeof schedule.student === "object")
+      ? schedule.student
+      : { _id: schedule.student, name: "Student", email: "", role: "student" };
+
+    const tutorObj = (schedule.tutor && typeof schedule.tutor === "object")
+      ? schedule.tutor
+      : { _id: schedule.tutor, name: "Tutor", email: "", role: "tutor" };
+
+    booking = {
+      _id: schedule._id,
+      student: studentObj,
+      tutor: tutorObj,
+      status: schedule.status,
+      date: schedule.date,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      classType: schedule.classType,
+      isTrial: schedule.isTrial,
+      booking: schedule.booking,
+      tutorProfile: { subjects: [schedule.subject || "Tuition Session"] },
+      subject: schedule.subject || "Tuition Session",
+      mode: schedule.mode || "Online",
+    };
+    return booking;
+  }
+  return null;
+}
+
+function validateSocketSessionTime(booking) {
+  if (!booking) return { valid: false, message: "Class session not found." };
+
+  const inactiveStatuses = ["Completed", "Cancelled", "Rejected", "Rejected by Admin", "Rejected by Tutor", "Discontinued", "Missed"];
+  if (inactiveStatuses.includes(booking.status)) {
+    return {
+      valid: false,
+      message: booking.status === "Completed"
+        ? "This demo class session has already completed."
+        : `This class session is no longer active (${booking.status}).`,
+    };
+  }
+
+  const validStatuses = ["Accepted", "Confirmed", "Approved", "Scheduled", "Rescheduled", "In Progress"];
+  const isStatusValid = validStatuses.includes(booking.status) || (booking.adminApproved && booking.tutorApproved);
+  if (!isStatusValid) {
+    return { valid: false, message: "Video call is only available for active sessions or scheduled classes." };
+  }
+
+  const sessionDate = booking.date || booking.scheduledDate;
+  const startTimeStr = booking.startTime || booking.scheduledStartTime;
+  const endTimeStr = booking.endTime || booking.scheduledEndTime;
+
+  if (sessionDate && startTimeStr) {
+    const startDateTime = parseScheduleTime(sessionDate, startTimeStr);
+    const endDateTime = endTimeStr ? parseScheduleTime(sessionDate, endTimeStr) : new Date(startDateTime.getTime() + 60 * 60 * 1000);
+    const now = new Date();
+
+    const joinWindowStart = new Date(startDateTime.getTime() - 15 * 60 * 1000);
+    const joinWindowEnd = new Date(endDateTime.getTime() + 2 * 60 * 60 * 1000);
+
+    const formattedDate = new Date(sessionDate).toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    const formattedStartTime = format12HourTime(startTimeStr);
+
+    if (now < joinWindowStart) {
+      return {
+        valid: false,
+        message: `This demo class is scheduled for ${formattedDate} at ${formattedStartTime}. You can join 15 minutes before the start time.`,
+      };
+    }
+
+    if (now > joinWindowEnd) {
+      return {
+        valid: false,
+        message: `The scheduled time for this class (${formattedDate} at ${formattedStartTime}) has passed.`,
       };
     }
   }
-  return booking;
+
+  return { valid: true };
 }
+
 
 function initVideoCallSocket(io) {
 
@@ -152,12 +241,10 @@ function initVideoCallSocket(io) {
         }
 
         const booking = await findBookingOrScheduleSocket(bIdStr);
+        const validation = validateSocketSessionTime(booking);
 
-        const validStatuses = ["Accepted", "Confirmed", "Approved", "Scheduled"];
-        const isStatusValid = booking && (validStatuses.includes(booking.status) || (booking.adminApproved && booking.tutorApproved));
-
-        if (!booking || !isStatusValid) {
-          socket.emit("video-error", { message: "Video call is only available for active sessions or ACCEPTED bookings." });
+        if (!booking || !validation.valid) {
+          socket.emit("video-error", { message: validation.message || "Video call is unavailable for this session." });
           return;
         }
 
@@ -284,12 +371,10 @@ function initVideoCallSocket(io) {
       try {
         const bIdStr = bookingId.toString();
         const booking = await findBookingOrScheduleSocket(bIdStr);
+        const validation = validateSocketSessionTime(booking);
 
-        const validStatuses = ["Accepted", "Confirmed", "Approved", "Scheduled"];
-        const isStatusValid = booking && (validStatuses.includes(booking.status) || (booking.adminApproved && booking.tutorApproved));
-
-        if (!booking || !isStatusValid) {
-          socket.emit("video-error", { message: "Class session or booking is not accepted or invalid." });
+        if (!booking || !validation.valid) {
+          socket.emit("video-error", { message: validation.message || "Class session is not active or scheduled." });
           return;
         }
 

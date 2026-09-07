@@ -245,6 +245,12 @@ export const studentApi = {
     return await res.json();
   },
 
+  // Get Discontinue Class Preview & Fee/Refund Calculation
+  getDiscontinuePreview: async (tutorId) => {
+    const res = await fetch(`/api/student/discontinue-preview?tutorId=${tutorId}`);
+    return await res.json();
+  },
+
   // Discontinue Regular Classes with Selected Tutor
   discontinueClass: async (payload) => {
     const res = await fetch('/api/student/discontinue-class', {

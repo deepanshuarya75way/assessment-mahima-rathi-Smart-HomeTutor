@@ -148,6 +148,9 @@ exports.updateTutorProfile = async (req, res) => {
       serviceAreas,
       homeVisitsEnabled,
       language,
+      demoDuration,
+      demoAvailableDays,
+      demoTimeSlots,
     } = req.body;
 
     const parseArray = (input) => {
@@ -239,6 +242,17 @@ exports.updateTutorProfile = async (req, res) => {
     if (additionalFeeNotes !== undefined) tutorProfile.additionalFeeNotes = additionalFeeNotes;
     if (homeVisitsEnabled !== undefined) tutorProfile.homeVisitsEnabled = Boolean(homeVisitsEnabled);
     if (serviceAreaRadius !== undefined) tutorProfile.serviceAreaRadius = Number(serviceAreaRadius) || 10;
+
+    // Demo Class Slots & Settings
+    if (demoDuration !== undefined) {
+      tutorProfile.demoDuration = Number(demoDuration) || 60;
+    }
+    if (demoAvailableDays !== undefined) {
+      tutorProfile.demoAvailableDays = parseArray(demoAvailableDays);
+    }
+    if (demoTimeSlots !== undefined) {
+      tutorProfile.demoTimeSlots = parseArray(demoTimeSlots);
+    }
 
     await tutorProfile.save();
 
@@ -819,12 +833,40 @@ exports.getBookingRequests = async (req, res) => {
       .populate("tutorProfile", "qualification fee subjects location primarySubject")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ success: true, requests });
+    // Populate corresponding demo schedule details (date, time, status)
+    const demoSchedules = await ClassSchedule.find({
+      tutor: tutorId,
+      $or: [{ classType: "demo" }, { isTrial: true }],
+    }).populate("student", "name email phone");
+
+    const scheduleMap = new Map();
+    demoSchedules.forEach((s) => {
+      if (s.booking) scheduleMap.set(s.booking.toString(), s);
+    });
+
+    const enrichedRequests = requests.map((r) => {
+      const sch = scheduleMap.get(r._id.toString());
+      const rObj = r.toObject ? r.toObject() : r;
+      return {
+        ...rObj,
+        scheduledDate: sch ? sch.date : (r.date || null),
+        scheduledStartTime: sch ? sch.startTime : (r.startTime || "18:00"),
+        scheduledEndTime: sch ? sch.endTime : (r.endTime || "19:00"),
+        scheduleId: sch ? sch._id : null,
+        scheduleStatus: sch ? sch.status : null,
+        isScheduled: Boolean(sch),
+        classType: "demo",
+        frequency: "One-Time",
+      };
+    });
+
+    return res.status(200).json({ success: true, requests: enrichedRequests });
   } catch (err) {
     console.error("Get Booking Requests Error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
 
 exports.acceptBookingRequest = async (req, res) => {
   try {
@@ -1152,6 +1194,30 @@ exports.getTutorDashboardStats = async (req, res) => {
     let avgRating = profile ? profile.rating : 5.0;
     let totalReviews = profile ? profile.totalReviews : reviews.length;
 
+    // Regular Recurring Schedules (Exclusive to enrolled regular students)
+    const regularSchedules = await ClassSchedule.find({
+      tutor: tutorId,
+      $or: [
+        { classType: "regular" },
+        { classType: { $ne: "demo" }, isTrial: { $ne: true }, frequency: { $ne: "One-Time" } },
+      ],
+      status: { $nin: ["Cancelled", "Discontinued"] },
+    })
+      .populate("student", "name email phone role")
+      .sort({ date: 1, startTime: 1 });
+
+    // Demo Schedules (One-time trial demo sessions only)
+    const demoSchedules = await ClassSchedule.find({
+      tutor: tutorId,
+      $or: [
+        { classType: "demo" },
+        { isTrial: true },
+        { frequency: "One-Time" },
+      ],
+    })
+      .populate("student", "name email phone role")
+      .sort({ date: -1, startTime: 1 });
+
     return res.status(200).json({
       success: true,
       stats: {
@@ -1170,7 +1236,11 @@ exports.getTutorDashboardStats = async (req, res) => {
         referredCount,
         referralCode: userReferralCode,
         referralEarnings: user ? user.referralEarnings || 0 : 0,
+        regularSchedulesCount: regularSchedules.length,
+        demoSchedulesCount: demoSchedules.length,
       },
+      regularSchedules,
+      demoSchedules,
       todaysClasses,
       acceptedStudents: acceptedRequests.map((b) => b.student),
       reviews,
@@ -1182,6 +1252,7 @@ exports.getTutorDashboardStats = async (req, res) => {
       referralEarnings: user ? user.referralEarnings || 0 : 0,
       referredCount,
     });
+
   } catch (err) {
     console.error("Get Tutor Dashboard Stats Error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });

@@ -64,6 +64,26 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
   const [homeVisitsEnabled, setHomeVisitsEnabled] = useState(true);
   const [about, setAbout] = useState('');
 
+  // Demo Class Slots State (Separate from regular recurring availability)
+  const [demoDuration, setDemoDuration] = useState(60);
+  const [demoAvailableDays, setDemoAvailableDays] = useState([
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ]);
+  const [demoTimeSlots, setDemoTimeSlots] = useState([
+    '05:00 PM – 06:00 PM',
+    '06:00 PM – 07:00 PM',
+    '07:00 PM – 08:00 PM',
+  ]);
+  const [customSlotStart, setCustomSlotStart] = useState('05:00 PM');
+  const [customSlotEnd, setCustomSlotEnd] = useState('06:00 PM');
+  const [editingSlotIdx, setEditingSlotIdx] = useState(null);
+  const [editingSlotVal, setEditingSlotVal] = useState('');
+
   useEffect(() => {
     if (tutorProfile) {
       setFullName(tutorProfile.fullName || tutorProfile.user?.name || '');
@@ -94,6 +114,19 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
       setEndTime(tutorProfile.endTime || '19:00');
       setHomeVisitsEnabled(tutorProfile.homeVisitsEnabled !== undefined ? tutorProfile.homeVisitsEnabled : true);
       setAbout(tutorProfile.about || '');
+
+      // Load Demo Class Slot Settings
+      setDemoDuration(tutorProfile.demoDuration !== undefined ? Number(tutorProfile.demoDuration) : 60);
+      setDemoAvailableDays(
+        Array.isArray(tutorProfile.demoAvailableDays) && tutorProfile.demoAvailableDays.length > 0
+          ? tutorProfile.demoAvailableDays
+          : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      );
+      setDemoTimeSlots(
+        Array.isArray(tutorProfile.demoTimeSlots) && tutorProfile.demoTimeSlots.length > 0
+          ? tutorProfile.demoTimeSlots.map((s) => (typeof s === 'object' && s !== null ? s.slotLabel || `${s.startTime} – ${s.endTime}` : String(s)))
+          : ['05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM', '07:00 PM – 08:00 PM']
+      );
     }
   }, [tutorProfile, isOpen]);
 
@@ -121,6 +154,30 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
     }
   };
 
+  // Demo Time Slot Helpers
+  const handleAddDemoSlot = (slotString) => {
+    const trimmed = (slotString || `${customSlotStart} – ${customSlotEnd}`).trim();
+    if (!trimmed) return;
+    if (!demoTimeSlots.includes(trimmed)) {
+      setDemoTimeSlots([...demoTimeSlots, trimmed]);
+    }
+  };
+
+  const handleRemoveDemoSlot = (indexToRemove) => {
+    setDemoTimeSlots(demoTimeSlots.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSaveEditedSlot = (idx) => {
+    const trimmed = editingSlotVal.trim();
+    if (trimmed) {
+      const updated = [...demoTimeSlots];
+      updated[idx] = trimmed;
+      setDemoTimeSlots(updated);
+    }
+    setEditingSlotIdx(null);
+    setEditingSlotVal('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -136,6 +193,14 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
     }
     if (isNaN(Number(fee)) || Number(fee) < 0) {
       setErrorMsg('Fee must be a valid positive number.');
+      return;
+    }
+    if (demoAvailableDays.length === 0) {
+      setErrorMsg('Please select at least one available day for demo classes.');
+      return;
+    }
+    if (demoTimeSlots.length === 0) {
+      setErrorMsg('Please add at least one available time slot for demo classes.');
       return;
     }
 
@@ -168,6 +233,9 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
         endTime,
         homeVisitsEnabled,
         about: about.trim(),
+        demoDuration: Number(demoDuration) || 60,
+        demoAvailableDays,
+        demoTimeSlots,
       };
 
       const res = await tutorApi.updateTutorProfile(payload);
@@ -218,7 +286,7 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
           background: '#ffffff',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '720px',
+          maxWidth: '840px',
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -254,28 +322,48 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
         </div>
 
         {/* MODAL NAVIGATION TABS */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#ffffff', padding: '0 24px' }}>
+        <div
+          className="no-scrollbar"
+          style={{
+            display: 'flex',
+            borderBottom: '1px solid #e2e8f0',
+            background: '#ffffff',
+            padding: '0 16px',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            alignItems: 'center',
+            gap: '4px',
+            minHeight: '52px',
+          }}
+        >
           {[
             { id: 'subjects', label: 'Subjects & Teaching', icon: 'fa-book-open' },
             { id: 'rates', label: 'Rates & Availability', icon: 'fa-sack-dollar' },
             { id: 'personal', label: 'Personal & Contact', icon: 'fa-user' },
             { id: 'qualifications', label: 'Qualifications & Exp', icon: 'fa-graduation-cap' },
+            { id: 'demo-slots', label: 'Demo Class Slots', icon: 'fa-calendar-check' },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '12px 16px',
+                padding: '14px 12px',
                 border: 'none',
                 background: 'none',
                 fontSize: '13px',
+                lineHeight: '1.4',
                 fontWeight: activeTab === tab.id ? '800' : '600',
                 color: activeTab === tab.id ? '#0284c7' : '#64748b',
                 borderBottom: activeTab === tab.id ? '3px solid #0284c7' : '3px solid transparent',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '7px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease',
               }}
             >
               <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
@@ -802,6 +890,322 @@ export const EditTutorProfileModal = ({ isOpen, onClose, tutorProfile, onSuccess
                     onChange={(e) => setPreviousInstitute(e.target.value)}
                     style={{ width: '100%', height: '42px', fontSize: '13.5px', padding: '0 14px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: DEMO CLASS SLOTS */}
+            {activeTab === 'demo-slots' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* INFO BANNER */}
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 16px', color: '#166534', fontSize: '13px' }}>
+                  <div style={{ fontWeight: '800', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <i className="fa-solid fa-graduation-cap"></i> 1-on-1 Trial Demo Class Availability
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#15803d', lineHeight: '1.5' }}>
+                    These settings are <strong>strictly for one-time trial demo classes</strong> booked by prospective students. They do NOT affect your regular recurring weekly class schedule.
+                  </p>
+                </div>
+
+                {/* 1. DEMO CLASS DURATION */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '800', color: '#0f2a4a', marginBottom: '6px' }}>
+                    1. Demo Class Duration
+                  </label>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748b' }}>
+                    Select the standard duration for your trial demo sessions.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {[
+                      { val: 30, label: '30 Minutes' },
+                      { val: 45, label: '45 Minutes' },
+                      { val: 60, label: '60 Minutes (Standard)' },
+                      { val: 90, label: '90 Minutes' },
+                    ].map((dur) => {
+                      const isSelected = demoDuration === dur.val;
+                      return (
+                        <button
+                          key={dur.val}
+                          type="button"
+                          onClick={() => setDemoDuration(dur.val)}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: isSelected ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                            background: isSelected ? '#e0f2fe' : '#ffffff',
+                            color: isSelected ? '#0369a1' : '#334155',
+                            fontWeight: isSelected ? '800' : '600',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          {isSelected && <FiCheck size={14} />} {dur.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. DEMO CLASS AVAILABLE DAYS */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '800', color: '#0f2a4a', margin: 0 }}>
+                      2. Demo Class Available Days * ({demoAvailableDays.length} Selected)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setDemoAvailableDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])}
+                        style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                      >
+                        All 7 Days
+                      </button>
+                      <span style={{ color: '#cbd5e1' }}>&bull;</span>
+                      <button
+                        type="button"
+                        onClick={() => setDemoAvailableDays(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])}
+                        style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                      >
+                        Mon - Fri
+                      </button>
+                      <span style={{ color: '#cbd5e1' }}>&bull;</span>
+                      <button
+                        type="button"
+                        onClick={() => setDemoAvailableDays([])}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748b' }}>
+                    Select which days you are willing to conduct 1-on-1 trial demo classes.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                      const isSelected = demoAvailableDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleArrayItem(demoAvailableDays, setDemoAvailableDays, day)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            border: isSelected ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                            background: isSelected ? '#dcfce7' : '#ffffff',
+                            color: isSelected ? '#15803d' : '#475569',
+                            fontWeight: isSelected ? '700' : '600',
+                            fontSize: '12.5px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          {isSelected ? <FiCheckSquare size={14} /> : <FiSquare size={14} />} {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. DEMO CLASS TIME SLOTS */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '800', color: '#0f2a4a', marginBottom: '6px' }}>
+                    3. Demo Class Time Slots * ({demoTimeSlots.length} Slots Configured)
+                  </label>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#64748b' }}>
+                    Define the specific time slots during which students can book their demo session with you.
+                  </p>
+
+                  {/* ACTIVE TIME SLOTS LIST */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                    {demoTimeSlots.length === 0 ? (
+                      <div style={{ padding: '16px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', color: '#94a3b8', fontSize: '12.5px' }}>
+                        No demo time slots added yet. Please add at least one slot below.
+                      </div>
+                    ) : (
+                      demoTimeSlots.map((slot, idx) => {
+                        const isEditing = editingSlotIdx === idx;
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 14px',
+                              background: '#f8fafc',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            {isEditing ? (
+                              <div style={{ display: 'flex', gap: '8px', flex: 1, alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  className="tr-input"
+                                  value={editingSlotVal}
+                                  onChange={(e) => setEditingSlotVal(e.target.value)}
+                                  placeholder="e.g. 05:00 PM – 06:00 PM"
+                                  style={{ flex: 1, height: '36px', fontSize: '13px', borderRadius: '6px', border: '1px solid #0284c7', padding: '0 10px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="dash-btn dash-btn-primary"
+                                  onClick={() => handleSaveEditedSlot(idx)}
+                                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  className="dash-btn dash-btn-outline"
+                                  onClick={() => { setEditingSlotIdx(null); setEditingSlotVal(''); }}
+                                  style={{ padding: '6px 12px', fontSize: '12px' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>
+                                    {idx + 1}
+                                  </span>
+                                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a' }}>
+                                    <i className="fa-regular fa-clock" style={{ color: '#0284c7', marginRight: '6px' }}></i> {slot}
+                                  </span>
+                                  <span style={{ fontSize: '10.5px', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                    {demoDuration} Mins
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditingSlotIdx(idx); setEditingSlotVal(slot); }}
+                                    style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#475569', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}
+                                    title="Edit Slot"
+                                  >
+                                    <i className="fa-solid fa-pen"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveDemoSlot(idx)}
+                                    style={{ background: 'none', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}
+                                    title="Remove Slot"
+                                  >
+                                    <i className="fa-solid fa-trash"></i>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* ADD CUSTOM / PRESET TIME SLOTS */}
+                  <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '14px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '8px' }}>
+                      Add New Time Slot:
+                    </span>
+                    
+                    {/* CUSTOM START & END TIME INPUTS */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: '130px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px' }}>Start Time</label>
+                        <select
+                          className="tr-input"
+                          value={customSlotStart}
+                          onChange={(e) => setCustomSlotStart(e.target.value)}
+                          style={{ width: '100%', height: '38px', fontSize: '13px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px' }}
+                        >
+                          {[
+                            '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+                            '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM',
+                            '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM',
+                          ].map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: '130px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px' }}>End Time</label>
+                        <select
+                          className="tr-input"
+                          value={customSlotEnd}
+                          onChange={(e) => setCustomSlotEnd(e.target.value)}
+                          style={{ width: '100%', height: '38px', fontSize: '13px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px' }}
+                        >
+                          {[
+                            '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM',
+                            '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM',
+                            '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM',
+                          ].map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="dash-btn dash-btn-primary"
+                        onClick={() => handleAddDemoSlot(`${customSlotStart} – ${customSlotEnd}`)}
+                        style={{ alignSelf: 'flex-end', height: '38px', padding: '0 16px', fontSize: '12.5px', fontWeight: '700' }}
+                      >
+                        <i className="fa-solid fa-plus"></i> Add Time Slot
+                      </button>
+                    </div>
+
+                    {/* QUICK PRESET BUTTONS */}
+                    <div>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                        Quick Add Common Time Slots:
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {[
+                          '10:00 AM – 11:00 AM',
+                          '04:00 PM – 05:00 PM',
+                          '05:00 PM – 06:00 PM',
+                          '06:00 PM – 07:00 PM',
+                          '07:00 PM – 08:00 PM',
+                          '08:00 PM – 09:00 PM',
+                        ].map((preset) => {
+                          const isAdded = demoTimeSlots.includes(preset);
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => {
+                                if (!isAdded) handleAddDemoSlot(preset);
+                              }}
+                              disabled={isAdded}
+                              style={{
+                                background: isAdded ? '#f1f5f9' : '#e0f2fe',
+                                color: isAdded ? '#94a3b8' : '#0284c7',
+                                border: isAdded ? '1px solid #e2e8f0' : '1px solid #bae6fd',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11.5px',
+                                fontWeight: '600',
+                                cursor: isAdded ? 'default' : 'pointer',
+                              }}
+                            >
+                              {isAdded ? <FiCheck size={12} style={{ display: 'inline', marginRight: '3px' }} /> : <FiPlus size={12} style={{ display: 'inline', marginRight: '3px' }} />}
+                              {preset}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

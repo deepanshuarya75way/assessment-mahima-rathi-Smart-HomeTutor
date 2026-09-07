@@ -131,6 +131,7 @@ export const TutorProfile = () => {
         onClose={() => setIsBookingModalOpen(false)}
         tutorId={id}
         tutorName={tutorName}
+        tutor={tutor}
       />
 
       {/* REGULAR CLASS PAYMENT & BOOKING MODAL */}

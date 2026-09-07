@@ -87,12 +87,32 @@ exports.getSchedules = async (req, res) => {
       filter = { student: userId };
     }
 
+    if (req.query.type === "regular") {
+      filter = {
+        ...filter,
+        $or: [
+          { classType: "regular" },
+          { classType: { $ne: "demo" }, isTrial: { $ne: true }, frequency: { $ne: "One-Time" } },
+        ],
+      };
+    } else if (req.query.type === "demo") {
+      filter = {
+        ...filter,
+        $or: [
+          { classType: "demo" },
+          { isTrial: true },
+          { frequency: "One-Time" },
+        ],
+      };
+    }
+
     const schedules = await ClassSchedule.find(filter)
       .populate("tutor", "name email phone")
       .populate("student", "name email phone")
       .sort({ date: 1, startTime: 1 });
 
     return res.status(200).json({ success: true, schedules });
+
   } catch (err) {
     console.error("Get Schedules Error:", err);
     return res.status(500).json({ success: false, message: "Server Error" });

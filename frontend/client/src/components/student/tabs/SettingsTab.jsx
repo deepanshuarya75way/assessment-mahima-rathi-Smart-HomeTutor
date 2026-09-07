@@ -52,6 +52,8 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
   const [discLoading, setDiscLoading] = useState(false);
   const [discSuccess, setDiscSuccess] = useState('');
   const [discError, setDiscError] = useState('');
+  const [discPreview, setDiscPreview] = useState(null);
+  const [discPreviewLoading, setDiscPreviewLoading] = useState(false);
 
   // Fetch Active Regular Tutors when Danger tab is active
   useEffect(() => {
@@ -80,6 +82,28 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
   const selectedTutor = activeTutors.find(
     (t) => String(t._id) === String(selectedTutorId) || String(t.tutorProfileId) === String(selectedTutorId)
   );
+
+  // Load preview when tutor selection changes
+  const handleOpenDiscModal = async () => {
+    if (!selectedTutorId) {
+      setDiscError('Please select a tutor to discontinue classes.');
+      return;
+    }
+    setDiscError('');
+    setIsDiscModalOpen(true);
+    setDiscPreviewLoading(true);
+    setDiscPreview(null);
+    try {
+      const res = await studentApi.getDiscontinuePreview(selectedTutorId);
+      if (res.success && res.preview) {
+        setDiscPreview(res.preview);
+      }
+    } catch (err) {
+      console.error('Failed to load discontinue preview:', err);
+    } finally {
+      setDiscPreviewLoading(false);
+    }
+  };
 
   // Populate profile form from studentData prop or fetch initial profile
   useEffect(() => {
@@ -652,10 +676,7 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
                     opacity: selectedTutorId ? 1 : 0.5,
                     cursor: selectedTutorId ? 'pointer' : 'not-allowed',
                   }}
-                  onClick={() => {
-                    setDiscError('');
-                    setIsDiscModalOpen(true);
-                  }}
+                  onClick={handleOpenDiscModal}
                 >
                   <ExclamationIcon size={18} color="#ffffff" /> Discontinue Classes
                 </button>
@@ -669,7 +690,7 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
       {/* DISCONTINUE CLASSES CONFIRMATION MODAL */}
       {isDiscModalOpen && selectedTutor && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '20px' }}>
-          <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', position: 'relative' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '520px', width: '100%', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', position: 'relative' }}>
             
             <button
               type="button"
@@ -689,13 +710,73 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
               </div>
             </div>
 
-            <p style={{ color: '#334155', fontSize: '14.5px', lineHeight: '1.5', marginBottom: '12px' }}>
-              You are about to discontinue your regular classes with <strong>{selectedTutor.name}</strong> ({selectedTutor.subject || 'Regular Classes'}).
-            </p>
+            {discPreviewLoading ? (
+              <div style={{ padding: '30px 10px', textAlign: 'center', color: '#64748b' }}>
+                <SpinnerIcon size={24} color="#dc2626" />
+                <p style={{ margin: '10px 0 0 0', fontSize: '13.5px', fontWeight: 600 }}>Checking fee payment and class usage status...</p>
+              </div>
+            ) : discPreview && (discPreview.isFullyPaid || discPreview.totalPaidAmount > 0) ? (
+              /* FULLY / PARTIALLY PAID FEE FLOW WITH REFUND */
+              <div>
+                <div style={{ background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ color: '#059669', fontSize: '18px', marginTop: '1px' }}>
+                      <CheckIcon size={20} color="#059669" />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: 800, color: '#065f46' }}>
+                        Paid Fees & Refund Eligible
+                      </h4>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '13.5px', color: '#047857', lineHeight: '1.5', fontWeight: 600 }}>
+                        Your fees for this tutor have already been paid. You have <strong>{discPreview.remainingClasses}</strong> {discPreview.remainingClasses === 1 ? 'class' : 'classes'} remaining.
+                      </p>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#065f46', fontWeight: 800 }}>
+                        Refund/adjustment amount: ₹{discPreview.refundAmount.toLocaleString('en-IN')}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px 14px', borderRadius: '10px', marginBottom: '18px', color: '#475569', fontSize: '13px', lineHeight: '1.5' }}>
-              Your account will remain active, but your regular classes with this tutor will be discontinued.
-            </div>
+                {/* BREAKDOWN CARD */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#475569' }}>
+                    <span>Tutor & Subject:</span>
+                    <strong style={{ color: '#0f2a4a' }}>{selectedTutor.name} ({selectedTutor.subject || 'Regular Classes'})</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#475569' }}>
+                    <span>Total Fee Paid:</span>
+                    <strong style={{ color: '#0f2a4a' }}>₹{discPreview.totalPaidAmount.toLocaleString('en-IN')}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#475569' }}>
+                    <span>Classes Completed:</span>
+                    <span style={{ fontWeight: 700, color: '#0f2a4a' }}>{discPreview.usedClasses} of {discPreview.totalClasses}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#475569' }}>
+                    <span>Classes Remaining:</span>
+                    <span style={{ fontWeight: 700, color: '#0284c7' }}>{discPreview.remainingClasses}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '4px', fontSize: '13.5px' }}>
+                    <span style={{ fontWeight: 800, color: '#0f2a4a' }}>Refund to Smart Wallet:</span>
+                    <strong style={{ color: '#059669', fontSize: '14.5px' }}>₹{discPreview.refundAmount.toLocaleString('en-IN')}</strong>
+                  </div>
+                </div>
+
+                <p style={{ color: '#334155', fontSize: '13.5px', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                  Do you want to discontinue regular classes with <strong>{selectedTutor.name}</strong>? Unused class balance (₹{discPreview.refundAmount.toLocaleString('en-IN')}) will be refunded directly to your Smart Wallet upon confirmation.
+                </p>
+              </div>
+            ) : (
+              /* UNPAID / ZERO PAYMENT FLOW */
+              <div>
+                <p style={{ color: '#334155', fontSize: '14.5px', lineHeight: '1.5', marginBottom: '12px' }}>
+                  You are about to discontinue your regular classes with <strong>{selectedTutor.name}</strong> ({selectedTutor.subject || 'Regular Classes'}).
+                </p>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px 14px', borderRadius: '10px', marginBottom: '18px', color: '#475569', fontSize: '13px', lineHeight: '1.5' }}>
+                  Your account will remain active, but your regular classes with this tutor will be discontinued.
+                </div>
+              </div>
+            )}
 
             {discError && (
               <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginBottom: '14px' }}>
@@ -708,20 +789,22 @@ export const SettingsTab = ({ studentData, onProfileUpdated }) => {
                 type="button"
                 className="dash-btn dash-btn-outline"
                 onClick={() => setIsDiscModalOpen(false)}
-                disabled={discLoading}
+                disabled={discLoading || discPreviewLoading}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="settings-btn-danger"
-                disabled={discLoading}
+                disabled={discLoading || discPreviewLoading}
                 onClick={handleDiscontinueSubmit}
               >
                 {discLoading ? (
                   <>
                     <SpinnerIcon size={16} color="#ffffff" /> Discontinuing...
                   </>
+                ) : discPreview && discPreview.refundAmount > 0 ? (
+                  'Discontinue & Claim Refund'
                 ) : (
                   'Confirm Discontinuation'
                 )}

@@ -2,6 +2,7 @@ import React from 'react';
 import { FiStar } from 'react-icons/fi';
 import { AnnouncementsList } from '../../common/AnnouncementsList';
 import { ReferralSection } from '../../common/ReferralSection';
+import { getSocket } from '../../../services/socket';
 
 export const TutorOverviewTab = ({
   stats,
@@ -117,63 +118,95 @@ export const TutorOverviewTab = ({
                     className="dash-btn dash-btn-primary"
                     style={{ padding: '6px 14px', fontSize: '12px' }}
                     onClick={() => {
-                      if (window.socket) {
-                        window.socket.emit('initiate-video-call', {
+                      const socket = getSocket();
+                      if (socket) {
+                        socket.emit('initiate-video-call', {
                           bookingId: item._id,
                           callerName: item.tutor?.name || 'Tutor',
                           callerRole: 'Tutor',
                         });
-                      } else {
-                        window.location.href = `/video-call/${item._id}`;
                       }
+                      window.location.href = `/video-call/${item._id}`;
                     }}
                   >
                     <i className="fa-solid fa-video"></i> Join Live
                   </button>
+
                 </div>
               ))
             )}
           </div>
           {/* ASSIGNED APPROVED DEMO CLASSES */}
           <div className="dash-card" style={{ marginTop: '20px' }}>
-            <div className="dash-card-header">
-              <h3><i className="fa-solid fa-calendar-check" style={{ color: '#16a34a' }}></i> Assigned Demo Classes (Admin Approved)</h3>
+            <div className="dash-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3><i className="fa-solid fa-calendar-check" style={{ color: '#0284c7' }}></i> Assigned Demo Classes (One-Time Trials)</h3>
+              <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0284c7', padding: '2px 8px', borderRadius: '12px', fontWeight: '700' }}>
+                One-Time Sessions
+              </span>
             </div>
 
-            {pendingRequests.filter((r) => r.status === 'Approved' || r.status === 'Accepted').length === 0 ? (
+            {pendingRequests.filter((r) => r.status === 'Approved' || r.status === 'Accepted' || r.status === 'Confirmed').length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontSize: '13px' }}>
-                No approved demo class sessions assigned at the moment.
+                No scheduled demo class sessions assigned at the moment.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {pendingRequests.filter((r) => r.status === 'Approved' || r.status === 'Accepted').map((req) => (
-                  <div
-                    key={req._id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px',
-                      background: '#f8fafc',
-                      borderRadius: '12px',
-                      border: '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div>
-                      <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#0f172a' }}>
-                        {req.student?.name || req.studentName || 'Student'} ({req.grade || req.class || 'Student'})
-                      </h4>
-                      <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                        Subject: {req.subject || 'General'} &bull; Status: {req.status}
-                      </p>
+                {pendingRequests.filter((r) => r.status === 'Approved' || r.status === 'Accepted' || r.status === 'Confirmed').map((req) => {
+                  const demoDateStr = req.scheduledDate
+                    ? new Date(req.scheduledDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                    : req.date || 'Scheduled Date';
+                  const demoTimeStr = req.scheduledStartTime || req.scheduledTime || req.time || '06:00 PM';
+
+                  return (
+                    <div
+                      key={req._id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '14px',
+                        background: '#f8fafc',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#0f172a' }}>
+                            {req.student?.name || req.studentName || 'Student'} ({req.grade || req.class || 'General'})
+                          </h4>
+                          <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0284c7', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>
+                            One-Time Demo
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0' }}>
+                          <strong>Subject:</strong> {req.subject || 'Tuition'} &bull; <strong>Date:</strong> {demoDateStr} &bull; <strong>Time:</strong> {demoTimeStr}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="dash-btn dash-btn-primary"
+                          style={{ padding: '6px 14px', fontSize: '12px', background: '#0284c7', borderColor: '#0284c7' }}
+                          onClick={() => {
+                            const socket = getSocket();
+                            if (socket) {
+                              socket.emit('initiate-video-call', {
+                                bookingId: req.scheduleId || req._id,
+                                callerName: req.tutor?.name || 'Tutor',
+                                callerRole: 'Tutor',
+                              });
+                            }
+                            window.location.href = `/video-call/${req.scheduleId || req._id}`;
+                          }}
+                        >
+                          <i className="fa-solid fa-video"></i> Start Demo
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '700', background: '#dcfce7', padding: '4px 10px', borderRadius: '12px', border: '1px solid #86efac' }}>
-                        <i className="fa-solid fa-circle-check"></i> Approved by Admin
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,10 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { studentApi } from '../../../services/studentApi';
+import { useAuth } from '../../../context/AuthContext';
+import { getSocket } from '../../../services/socket';
+import { checkClassJoinable } from '../../../utils/classTimeHelper';
 
 export const ClassesTab = ({ onStartVideoCall }) => {
+  const { userId, userName } = useAuth();
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'online' | 'offline'
+
+  const handleJoinClass = (item) => {
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('initiate-video-call', {
+        bookingId: item._id,
+        callerId: userId,
+        callerName: userName || 'Student',
+        callerRole: 'Student',
+      });
+    }
+    window.location.href = `/video-call/${item._id}`;
+  };
 
   useEffect(() => {
     studentApi.getClassSchedule().then((res) => {
@@ -87,12 +104,11 @@ export const ClassesTab = ({ onStartVideoCall }) => {
                   const isOnline = !item.mode || item.mode.toLowerCase() === 'online';
                   const isInactiveStatus = ['Completed', 'Cancelled', 'Discontinued', 'Missed', 'Rejected'].includes(item.status);
                   
-                  // Check if schedule date is in the past
-                  const scheduleTime = item.date ? new Date(item.date).getTime() : 0;
-                  const isPastDate = scheduleTime > 0 && scheduleTime + (24 * 60 * 60 * 1000) < Date.now();
-                  const isExpiredOrEnded = isInactiveStatus || (isPastDate && item.status !== 'Scheduled' && item.status !== 'Rescheduled');
+                  const timingStatus = checkClassJoinable(item.date, item.startTime || item.time, item.endTime, item.status);
+                  const isExpiredOrEnded = isInactiveStatus || timingStatus.isPast;
 
                   const formattedDate = new Date(item.date || Date.now()).toLocaleDateString('en-IN', {
+                    weekday: 'short',
                     day: 'numeric',
                     month: 'short',
                     year: 'numeric',
@@ -108,7 +124,7 @@ export const ClassesTab = ({ onStartVideoCall }) => {
                       </td>
                       <td style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
                         <div>{item.frequency || 'Weekly'}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{item.days || 'Mon, Wed'}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>{item.days || (item.frequency === 'One-Time' ? 'One-Time Session' : 'Mon, Wed')}</div>
                       </td>
                       <td style={{ fontSize: '13px', color: '#334155' }}>
                         <div style={{ fontWeight: '700' }}>{item.startTime || item.time || '05:00 PM'}</div>
@@ -127,16 +143,32 @@ export const ClassesTab = ({ onStartVideoCall }) => {
                             {item.status || 'Past Class'}
                           </span>
                         ) : isOnline ? (
-                          <button
-                            type="button"
-                            className="dash-btn dash-btn-primary"
-                            style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', gap: '6px' }}
-                            onClick={() => {
-                              window.location.href = `/video-call/${item._id}`;
-                            }}
-                          >
-                            <i className="fa-solid fa-video"></i> Join Class
-                          </button>
+                          timingStatus.canJoin ? (
+                            <button
+                              type="button"
+                              className="dash-btn dash-btn-primary"
+                              style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', gap: '6px' }}
+                              onClick={() => handleJoinClass(item)}
+                            >
+                              <i className="fa-solid fa-video"></i> Join Class
+                            </button>
+                          ) : (
+                            <span style={{
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              padding: '5px 10px',
+                              borderRadius: '8px',
+                              fontSize: '11.5px',
+                              fontWeight: '700',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              border: '1px solid #e2e8f0',
+                            }} title={timingStatus.actionNote}>
+                              <i className="fa-regular fa-clock" style={{ color: '#0284c7' }}></i>
+                              {timingStatus.actionNote}
+                            </span>
+                          )
                         ) : (
                           <span style={{ background: '#fef3c7', color: '#b45309', padding: '5px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <i className="fa-solid fa-house-user"></i> Offline Class
@@ -154,3 +186,5 @@ export const ClassesTab = ({ onStartVideoCall }) => {
     </div>
   );
 };
+
+

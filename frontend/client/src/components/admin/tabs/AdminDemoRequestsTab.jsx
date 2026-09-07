@@ -126,35 +126,36 @@ export const AdminDemoRequestsTab = () => {
 
         {/* DEMO REQUESTS TABLE */}
         <div className="dash-table-wrapper" style={{ marginTop: '16px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
-          <table className="dash-table" style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table className="dash-table" style={{ width: '100%', minWidth: '1150px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '150px' }}>REQUEST DETAILS</th>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '180px' }}>STUDENT</th>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '180px' }}>TUTOR ASSIGNED</th>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '160px' }}>SUBJECT & MODE</th>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '170px' }}>STATUS</th>
-                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '240px', textAlign: 'center' }}>ADMIN ACTIONS</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '160px' }}>REQUEST & TYPE</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '170px' }}>STUDENT</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '170px' }}>TUTOR ASSIGNED</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '150px' }}>SUBJECT & MODE</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '190px' }}>EXACT DEMO SCHEDULE</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '150px' }}>STATUS</th>
+                <th style={{ padding: '12px 14px', whiteSpace: 'nowrap', minWidth: '220px', textAlign: 'center' }}>ADMIN ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '14px' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '14px' }}>
                     <i className="fa-solid fa-spinner fa-spin" style={{ color: '#b45309', marginRight: '8px' }}></i>
                     Loading demo class requests...
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#dc2626', fontSize: '14px', fontWeight: '600' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#dc2626', fontSize: '14px', fontWeight: '600' }}>
                     <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: '8px' }}></i>
                     {error}
                   </td>
                 </tr>
               ) : filteredBookings.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '14px' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '14px' }}>
                     No demo class requests found in this category.
                   </td>
                 </tr>
@@ -162,13 +163,23 @@ export const AdminDemoRequestsTab = () => {
                 filteredBookings.map((b) => {
                   const studentName = b.student ? b.student.name || 'Student' : 'Student Account';
                   const studentEmail = b.student ? b.student.email : 'N/A';
+                  const studentPhone = b.student ? b.student.phone : '';
                   const tutorName = b.tutor ? b.tutor.name || 'Assigned Tutor' : 'General Request';
                   const tutorEmail = b.tutor ? b.tutor.email : 'N/A';
                   const isPendingAdmin = b.status === 'Pending' || b.status === 'Pending Admin Approval';
                   const isPendingTutor = b.status === 'Pending Tutor Acceptance';
                   const isConfirmed = b.status === 'Confirmed' || b.status === 'Accepted';
+                  const isCompleted = b.status === 'Completed';
                   const isRejectedAdmin = b.status === 'Rejected by Admin' || b.status === 'Rejected';
                   const isRejectedTutor = b.status === 'Rejected by Tutor';
+
+                  const rawDate = b.scheduledDate || b.date || b.createdAt;
+                  const demoDateStr = rawDate
+                    ? new Date(rawDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'Scheduled Date';
+                  const startTimeStr = b.scheduledStartTime || '18:00';
+                  const endTimeStr = b.scheduledEndTime || '19:00';
+                  const durationMins = b.duration || 60;
 
                   return (
                     <tr key={b._id} style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -176,32 +187,48 @@ export const AdminDemoRequestsTab = () => {
                         <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '13px' }}>
                           ID: #{b._id.toString().slice(-6).toUpperCase()}
                         </div>
-                        <small style={{ color: '#64748b' }}>
-                          {new Date(b.createdAt || Date.now()).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                        </small>
+                        <div style={{ marginTop: '4px' }}>
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', border: '1px solid #bae6fd' }}>
+                            One-Time &bull; Demo Class
+                          </span>
+                        </div>
                       </td>
                       <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
                         <div style={{ fontWeight: '700', color: '#0f2a4a' }}>{studentName}</div>
-                        <small style={{ color: '#64748b', wordBreak: 'break-all' }}>{studentEmail}</small>
+                        <small style={{ color: '#64748b', wordBreak: 'break-all', display: 'block' }}>{studentEmail}</small>
+                        {studentPhone && <small style={{ color: '#64748b' }}>{studentPhone}</small>}
                       </td>
                       <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
                         <div style={{ fontWeight: '700', color: '#0f2a4a' }}>{tutorName}</div>
-                        <small style={{ color: '#64748b', wordBreak: 'break-all' }}>{tutorEmail}</small>
+                        <small style={{ color: '#64748b', wordBreak: 'break-all', display: 'block' }}>{tutorEmail}</small>
                       </td>
                       <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
                         <span style={{ fontWeight: '600', color: '#334155' }}>
-                          {b.subject || 'General Demo'}
+                          {b.subject || 'Tuition Subject'}
                         </span>
                         <div>
                           <small style={{ color: '#64748b' }}>
-                            {b.isHomeVisit ? ' Home Visit' : ' Online Live Class'}
+                            {b.isHomeVisit ? '🚗 Home Visit' : '💻 Online Live Class'}
                           </small>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
+                        <div style={{ fontWeight: '700', color: '#0f2a4a', fontSize: '13px' }}>
+                          <i className="fa-regular fa-calendar" style={{ color: '#0284c7', marginRight: '5px' }}></i>
+                          {demoDateStr}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: '600', marginTop: '2px' }}>
+                          <i className="fa-regular fa-clock" style={{ marginRight: '4px' }}></i>
+                          {startTimeStr} – {endTimeStr}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '1px' }}>
+                          Duration: {durationMins} Mins
                         </div>
                       </td>
                       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                         <span
                           className={`status-pill ${
-                            isConfirmed
+                            isConfirmed || isCompleted
                               ? 'status-confirmed'
                               : isPendingAdmin || isPendingTutor
                               ? 'status-pending'
@@ -209,7 +236,7 @@ export const AdminDemoRequestsTab = () => {
                           }`}
                           style={{ whiteSpace: 'nowrap', display: 'inline-block' }}
                         >
-                          {b.status}
+                          {isCompleted ? 'Completed' : b.status}
                         </span>
                       </td>
                       <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
@@ -263,8 +290,10 @@ export const AdminDemoRequestsTab = () => {
                             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', marginRight: '4px', whiteSpace: 'nowrap' }}>
                               {isPendingTutor
                                 ? '⏳ Pending Tutor Acceptance'
+                                : isCompleted
+                                ? '✅ Demo Completed'
                                 : isConfirmed
-                                ? 'Confirmed Class'
+                                ? '✅ Confirmed / Scheduled'
                                 : isRejectedTutor
                                 ? 'Declined by Tutor'
                                 : 'Rejected by Admin'}

@@ -13,36 +13,55 @@ const User = require("../models/User");
 const { createNotification } = require("./notificationHelper");
 
 /**
- * Parses date + startTime / endTime string into exact JavaScript Date object.
+ * Parses date + startTime / endTime string into exact JavaScript Date object
+ * explicitly in Indian Standard Time (IST, UTC+05:30).
+ * Prevents OS/server timezone drift between Windows local (IST) and Render Linux (UTC).
  */
 const parseScheduleTime = (baseDate, timeStr) => {
-  const d = new Date(baseDate);
-  if (!timeStr) return d;
+  if (!baseDate) return new Date();
+  const rawDate = typeof baseDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(baseDate.trim())
+    ? new Date(`${baseDate.trim()}T00:00:00+05:30`)
+    : new Date(baseDate);
 
-  const str = String(timeStr).trim();
+  if (isNaN(rawDate.getTime())) return new Date();
 
-  // 12-hour format e.g. "06:00 PM" or "6:00PM"
-  const twelveMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (twelveMatch) {
-    let hours = parseInt(twelveMatch[1], 10);
-    const minutes = parseInt(twelveMatch[2], 10);
-    const ampm = twelveMatch[3].toUpperCase();
-    if (ampm === "PM" && hours < 12) hours += 12;
-    if (ampm === "AM" && hours === 12) hours = 0;
-    d.setHours(hours, minutes, 0, 0);
-    return d;
+  // Extract YYYY, MM, DD in IST (Asia/Kolkata) timezone
+  const istFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  // Format returns "YYYY-MM-DD"
+  const dateParts = istFormatter.format(rawDate);
+
+  let hours = 18;
+  let minutes = 0;
+
+  if (timeStr) {
+    const str = String(timeStr).trim();
+    // 12-hour format e.g. "06:00 PM" or "6:00PM"
+    const twelveMatch = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (twelveMatch) {
+      hours = parseInt(twelveMatch[1], 10);
+      minutes = parseInt(twelveMatch[2], 10);
+      const ampm = twelveMatch[3].toUpperCase();
+      if (ampm === "PM" && hours < 12) hours += 12;
+      if (ampm === "AM" && hours === 12) hours = 0;
+    } else {
+      // 24-hour format e.g. "18:00" or "9:30"
+      const twentyFourMatch = str.match(/^(\d{1,2}):(\d{2})$/);
+      if (twentyFourMatch) {
+        hours = parseInt(twentyFourMatch[1], 10);
+        minutes = parseInt(twentyFourMatch[2], 10);
+      }
+    }
   }
 
-  // 24-hour format e.g. "18:00" or "9:30"
-  const twentyFourMatch = str.match(/^(\d{1,2}):(\d{2})$/);
-  if (twentyFourMatch) {
-    const hours = parseInt(twentyFourMatch[1], 10);
-    const minutes = parseInt(twentyFourMatch[2], 10);
-    d.setHours(hours, minutes, 0, 0);
-    return d;
-  }
-
-  return d;
+  const pad = (num) => String(num).padStart(2, "0");
+  const isoISTString = `${dateParts}T${pad(hours)}:${pad(minutes)}:00+05:30`;
+  return new Date(isoISTString);
 };
 
 /**
@@ -69,14 +88,16 @@ const format12HourTime = (timeStr) => {
 };
 
 /**
- * Checks whether two Date objects fall on the same calendar day (local time).
+ * Checks whether two Date objects fall on the same calendar day in IST (Asia/Kolkata).
  */
 const isSameCalendarDay = (d1, d2) => {
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
+  if (!d1 || !d2) return false;
+  const date1 = new Date(d1);
+  const date2 = new Date(d2);
+  if (isNaN(date1.getTime()) || isNaN(date2.getTime())) return false;
+
+  const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+  return formatter.format(date1) === formatter.format(date2);
 };
 
 /**

@@ -677,3 +677,28 @@ exports.resetPassword = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error resetting password." });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id || req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User account not found." });
+    }
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tutorStatus: user.role === "tutor" ? (user.tutorStatus || "not_applied") : undefined,
+        referralCode: user.referralCode,
+        walletBalance: user.walletBalance,
+      },
+    });
+  } catch (err) {
+    console.error("Get Current User Error:", err);
+    return res.status(500).json({ success: false, message: "Server error retrieving user session." });
+  }
+};

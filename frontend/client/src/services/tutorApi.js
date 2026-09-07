@@ -91,5 +91,16 @@ export const tutorApi = {
       headers: { 'Accept': 'application/json' }
     });
     return res.json();
+  },
+
+  // Fetch teaching schedules (regular or demo)
+  async getSchedules(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const url = `/api/schedule/list${query ? `?${query}` : ''}`;
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    return res.json();
   }
 };
+

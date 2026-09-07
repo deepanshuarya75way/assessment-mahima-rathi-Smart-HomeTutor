@@ -1966,6 +1966,11 @@ exports.approveBookingRequest = async (req, res) => {
     const tutorName = booking.tutor ? (booking.tutor.name || "Tutor") : "Tutor";
     const subjectName = (booking.tutorProfile && booking.tutorProfile.primarySubject) || "Tuition";
 
+    const demoDateObj = booking.scheduledDate || booking.date || new Date();
+    const formattedDate = demoDateObj.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    const formattedTime = booking.scheduledStartTime || "18:00";
+    const formattedEndTime = booking.scheduledEndTime || "19:00";
+
     // RULE 4: Check if BOTH Admin and Tutor have approved
     if (booking.tutorApproved) {
       booking.status = "Confirmed";
@@ -1990,19 +1995,21 @@ exports.approveBookingRequest = async (req, res) => {
       await createNotification({
         userId: booking.student._id,
         title: "Demo Class Request Update ⌛",
-        message: `Admin has approved your demo request for ${tutorName}. Waiting for tutor approval.`,
+        message: `Admin has approved your demo request for ${tutorName} on ${formattedDate} at ${formattedTime}. Waiting for tutor acceptance.`,
         type: "booking",
+        actionUrl: "/dashboard/student?tab=classes",
         app: req.app,
       });
     }
 
-    // Notify Tutor
+    // Notify Tutor with exact date & time
     if (booking.tutor) {
       await createNotification({
         userId: booking.tutor._id,
         title: "New Demo Class Request 🎓",
-        message: `You have received a demo class request from ${studentName} for ${subjectName}. Please accept or reject the request.`,
+        message: `You have received a one-time demo class request from ${studentName} for ${subjectName} on ${formattedDate} (${formattedTime} – ${formattedEndTime}). Please accept or reject the request.`,
         type: "booking",
+        actionUrl: "/dashboard/tutor?tab=requests",
         app: req.app,
       });
     }

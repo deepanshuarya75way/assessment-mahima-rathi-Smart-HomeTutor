@@ -42,6 +42,7 @@ export const TutorDashboardPage = () => {
   const [tutorProfile, setTutorProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [schedule, setSchedule] = useState([]);
+  const [demoSchedule, setDemoSchedule] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [payoutHistory, setPayoutHistory] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -144,23 +145,42 @@ export const TutorDashboardPage = () => {
         const statsRes = await tutorApi.getDashboardStats();
         if (statsRes.success) {
           setStats(statsRes.stats || statsRes);
-          if (statsRes.todaySchedule) setSchedule(statsRes.todaySchedule);
           if (statsRes.payoutRequests) setPayoutHistory(statsRes.payoutRequests);
           if (statsRes.reviews) setReviews(statsRes.reviews);
         }
 
-        // 3. Load Booking Requests
+        // 3. Load Regular Schedules & Demo Schedules
+        let regSchedules = [];
+        let demoScheds = [];
+        try {
+          const schedRes = await tutorApi.getSchedules();
+          if (schedRes && schedRes.success && Array.isArray(schedRes.schedules)) {
+            regSchedules = schedRes.schedules.filter(s => s.classType === 'regular' || (!s.isTrial && s.frequency !== 'One-Time' && s.classType !== 'demo'));
+            demoScheds = schedRes.schedules.filter(s => s.classType === 'demo' || s.isTrial || s.frequency === 'One-Time');
+          }
+        } catch (sErr) {
+          console.error('Error fetching schedules:', sErr);
+        }
+
+        if (regSchedules.length === 0 && statsRes?.regularSchedules) {
+          regSchedules = statsRes.regularSchedules;
+        }
+        if (demoScheds.length === 0 && statsRes?.demoSchedules) {
+          demoScheds = statsRes.demoSchedules;
+        }
+
+        setSchedule(regSchedules);
+        setDemoSchedule(demoScheds);
+
+        // 4. Load Demo Booking Requests & Scheduled Demos
         const reqRes = await tutorApi.getBookingRequests();
         if (reqRes.success && reqRes.requests) {
           setPendingRequests(reqRes.requests);
-
-          const accepted = reqRes.requests.filter((r) => r.status === 'Accepted' || r.status === 'Confirmed');
-          if (accepted.length > 0) {
-            setSchedule((prev) => (prev.length > 0 ? prev : accepted));
-          }
+        } else {
+          setPendingRequests([]);
         }
 
-        // 4. Load Referral History
+        // 5. Load Referral History
         try {
           const refRes = await tutorApi.getReferrals();
           if (refRes.success && refRes.referredUsers) {
@@ -169,6 +189,7 @@ export const TutorDashboardPage = () => {
         } catch (rErr) {
           console.error('Error fetching tutor referrals:', rErr);
         }
+
       }
     } catch (err) {
       console.error('Error loading tutor dashboard data:', err);
@@ -244,7 +265,7 @@ export const TutorDashboardPage = () => {
         <div className="dash-tab-content" style={{ display: 'block' }}>
           <div className="dash-card" style={{ textAlign: 'center', padding: '50px 20px', maxWidth: '700px', margin: '40px auto', borderRadius: '16px' }}>
             <FiLock size={48} style={{ color: '#0284c7', marginBottom: '16px' }} />
-            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f2a4a', marginBottom: '10px' }}>Tutor Dashboard </h2>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#0f2a4a', marginBottom: '10px' }}>Tutor Dashboard</h2>
             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#334155', marginBottom: '8px' }}>Complete Registration</h3>
             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: '1.6' }}>
               Submit your application to unlock tutor features.
@@ -323,7 +344,12 @@ export const TutorDashboardPage = () => {
         )}
 
         {activeTab === 'sessions' && (
-          <TutorSessionsTab sessions={schedule} onRefresh={loadDashboardData} />
+          <TutorSessionsTab
+            sessions={schedule}
+            demoSessions={demoSchedule}
+            demoRequests={pendingRequests}
+            onRefresh={loadDashboardData}
+          />
         )}
 
         {activeTab === 'requests' && (

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getSocket } from '../../services/socket';
 import { VideoHeader } from '../../components/video/VideoHeader';
 import { VideoControls } from '../../components/video/VideoControls';
 import { VideoErrorOverlay } from '../../components/video/VideoErrorOverlay';
+
 
 export const VideoCall = () => {
   const { bookingId } = useParams();
@@ -153,26 +155,32 @@ export const VideoCall = () => {
     if (!sessionData) return;
 
     console.log('[Signaling] Connecting to Socket.IO signaling server...');
-    const ioFunc = window.io || (typeof io !== 'undefined' ? io : null);
-    if (!ioFunc) {
+    const socket = getSocket();
+    if (!socket) {
       showError('Socket Error', 'Socket.IO client script not available.');
       return;
     }
-    const socket = ioFunc();
     socketRef.current = socket;
 
     const { bookingId: bId, user, peerUser } = sessionData;
 
+    const joinRoomPayload = {
+      bookingId: bId,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+    };
+
+    if (socket.connected) {
+      console.log(`[Signaling] Socket already connected (ID: ${socket.id}). Joining video room...`);
+      updateStatus('connecting', 'Joining call room...');
+      socket.emit('join-video-room', joinRoomPayload);
+    }
+
     socket.on('connect', () => {
       console.log(`[Signaling] Socket connected with ID: ${socket.id}`);
       updateStatus('connecting', 'Joining call room...');
-
-      socket.emit('join-video-room', {
-        bookingId: bId,
-        userId: user.id,
-        userName: user.name,
-        userRole: user.role,
-      });
+      socket.emit('join-video-room', joinRoomPayload);
     });
 
     socket.on('room-joined', ({ peerCount }) => {
@@ -181,10 +189,18 @@ export const VideoCall = () => {
 
       if (peerCount === 1) {
         updateStatus('connecting', `Waiting for ${peerUser.name || 'participant'} to join...`);
+        // Notify peer who is currently on dashboard so they get the incoming call modal
+        socket.emit('initiate-video-call', {
+          bookingId: bId,
+          callerId: user.id,
+          callerName: user.name,
+          callerRole: user.role,
+        });
       } else {
         updateStatus('connecting', 'Peer detected. Establishing WebRTC connection...');
       }
     });
+
 
     socket.on('peer-joined', async ({ userName: newPeerName }) => {
       console.log(`[Signaling] Peer joined room: ${newPeerName}`);
@@ -487,12 +503,19 @@ export const VideoCall = () => {
         userId: sessionData.user.id,
       });
     }
+    if (sessionData && sessionData.bookingId) {
+      fetch(`/api/video-call/complete/${sessionData.bookingId}`, { method: 'POST' }).catch(() => {});
+    }
     teardownCall('Call ended');
   };
 
   const teardownCall = (reason = 'Call ended') => {
     if (isCleaningUpRef.current) return;
     isCleaningUpRef.current = true;
+
+    if (sessionData && sessionData.bookingId) {
+      fetch(`/api/video-call/complete/${sessionData.bookingId}`, { method: 'POST' }).catch(() => {});
+    }
 
     console.log('[WebRTC] Executing full call teardown...', reason);
 
@@ -509,13 +532,23 @@ export const VideoCall = () => {
     }
 
     if (socketRef.current) {
-      socketRef.current.disconnect();
+      socketRef.current.off('connect');
+      socketRef.current.off('room-joined');
+      socketRef.current.off('peer-joined');
+      socketRef.current.off('webrtc-offer');
+      socketRef.current.off('webrtc-answer');
+      socketRef.current.off('webrtc-ice-candidate');
+      socketRef.current.off('peer-media-state-changed');
+      socketRef.current.off('call-ended');
+      socketRef.current.off('peer-disconnected');
+      socketRef.current.off('video-error');
       socketRef.current = null;
     }
 
     const userRole = sessionData && sessionData.user ? sessionData.user.role : 'student';
     navigate(`/dashboard/${userRole.toLowerCase()}?message=${encodeURIComponent(reason)}`);
   };
+
 
   const updateStatus = (stateClass, labelText) => {
     setStatusState(stateClass);

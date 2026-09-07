@@ -46,6 +46,34 @@ const bookingRequestSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Demo / Scheduled Slot Preferences
+    date: {
+      type: Date,
+    },
+    scheduledDate: {
+      type: Date,
+    },
+    scheduledStartTime: {
+      type: String,
+      default: "18:00",
+    },
+    scheduledEndTime: {
+      type: String,
+      default: "19:00",
+    },
+    demoSlot: {
+      type: String,
+      default: "",
+    },
+    demoDay: {
+      type: String,
+      default: "",
+    },
+    subject: {
+      type: String,
+      default: "",
+    },
+
     // PART 2 LOCATION & TRIAL CLASS MANAGEMENT
     isTrial: {
       type: Boolean,

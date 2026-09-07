@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/student-dashboard.css';
 import { studentApi } from '../../services/studentApi';
+import { getSocket } from '../../services/socket';
 import { StudentSidebar } from '../../components/student/StudentSidebar';
 import { StudentHeaderBar } from '../../components/student/StudentHeaderBar';
 import { OverviewTab } from '../../components/student/tabs/OverviewTab';
@@ -180,16 +181,40 @@ export const StudentDashboardPage = () => {
     setBookModalOpen(true);
   };
 
-  const handleStartVideoCall = () => {
+  const handleStartVideoCall = (targetId) => {
+    if (targetId) {
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('initiate-video-call', {
+          bookingId: targetId,
+          callerId: studentUser?._id || studentUser?.id,
+          callerName: studentUser?.name || 'Student',
+          callerRole: 'Student',
+        });
+      }
+      window.location.href = `/video-call/${targetId}`;
+      return;
+    }
+
     if (statsData && statsData.bookings) {
       const acceptedBooking = statsData.bookings.find((b) => b.status === 'Accepted' || b.status === 'Confirmed');
       if (acceptedBooking) {
+        const socket = getSocket();
+        if (socket) {
+          socket.emit('initiate-video-call', {
+            bookingId: acceptedBooking._id,
+            callerId: studentUser?._id || studentUser?.id,
+            callerName: studentUser?.name || 'Student',
+            callerRole: 'Student',
+          });
+        }
         window.location.href = `/video-call/${acceptedBooking._id}`;
         return;
       }
     }
     showToast('Video Call Notice: Requires an ACCEPTED tuition booking with your tutor.');
   };
+
 
   const handleWalletTopupSuccess = (newBalance, msg) => {
     if (statsData && statsData.stats) {

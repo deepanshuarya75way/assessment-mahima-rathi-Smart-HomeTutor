@@ -111,9 +111,15 @@ export const OverviewTab = ({
                         Educator: {cls.tutor ? cls.tutor.name || 'Tutor' : 'Tutor'} &bull; {cls.time || 'Scheduled Time'}
                       </p>
                     </div>
-                    <button className="dash-btn dash-btn-primary" style={{ fontSize: '11.5px', padding: '5px 12px', borderRadius: '6px' }} onClick={onStartVideoCall}>
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn-primary"
+                      style={{ fontSize: '11.5px', padding: '5px 12px', borderRadius: '6px' }}
+                      onClick={() => onStartVideoCall && onStartVideoCall(cls._id)}
+                    >
                       <i className="fa-solid fa-video" style={{ marginRight: '5px' }}></i> Join Class
                     </button>
+
                   </div>
                 ))}
               </div>

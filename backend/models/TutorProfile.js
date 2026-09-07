@@ -243,6 +243,24 @@ const tutorProfileSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Step 4.1: Demo Class Slots & Settings (Separate from regular recurring availability)
+    demoDuration: {
+      type: Number,
+      default: 60, // in minutes
+    },
+    demoAvailableDays: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    demoTimeSlots: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+
     // Step 5: Optional Payment Details & Declaration
     paymentDetails: {
       accountHolderName: { type: String, default: "" },

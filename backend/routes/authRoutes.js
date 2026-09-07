@@ -6,6 +6,7 @@ const { requireAuth } = require("../middleware/authMiddleware");
 router.post("/signup", authController.signup);
 router.post("/login", authController.login);
 router.get("/logout", authController.logout);
+router.get("/me", requireAuth, authController.getMe);
 
 // OTP & Password Reset Routes
 router.post("/send-otp", authController.sendOTP);

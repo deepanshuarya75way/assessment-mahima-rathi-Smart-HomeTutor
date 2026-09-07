@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { getSocket } from '../../services/socket';
 
 export const SocketCallListener = () => {
   const { userId, userRole, userName } = useAuth();
@@ -8,15 +9,26 @@ export const SocketCallListener = () => {
   const [callStatusMsg, setCallStatusMsg] = useState('');
 
   useEffect(() => {
-    if (!userId || typeof window === 'undefined' || !window.io) return;
+    const socket = getSocket();
+    if (!socket) return;
 
-    const socket = window.socket || window.io();
-    window.socket = socket;
+    if (userId) {
+      const uidStr = String(userId);
+      socket.emit('join', { userId: uidStr, role: userRole });
+      socket.emit('register-user', { userId: uidStr });
+      socket.emit('check-active-call', { userId: uidStr });
+    }
 
-    const uidStr = String(userId);
-    socket.emit('join', { userId: uidStr, role: userRole });
-    socket.emit('register-user', { userId: uidStr });
-    socket.emit('check-active-call', { userId: uidStr });
+    const onConnect = () => {
+      if (userId) {
+        const uidStr = String(userId);
+        socket.emit('join', { userId: uidStr, role: userRole });
+        socket.emit('register-user', { userId: uidStr });
+        socket.emit('check-active-call', { userId: uidStr });
+      }
+    };
+
+    socket.on('connect', onConnect);
 
     const handleActiveStatus = ({ hasActiveCall, call }) => {
       if (hasActiveCall && call && call.status === 'calling') {
@@ -129,24 +141,28 @@ export const SocketCallListener = () => {
   }, [userId]);
 
   const acceptCall = () => {
-    if (incomingCall && window.socket) {
-      window.socket.emit('accept-video-call', { bookingId: incomingCall.bookingId });
+    const socket = getSocket();
+    if (incomingCall && socket) {
+      socket.emit('accept-video-call', { bookingId: incomingCall.bookingId });
     }
   };
 
   const declineCall = () => {
-    if (incomingCall && window.socket) {
-      window.socket.emit('decline-video-call', { bookingId: incomingCall.bookingId });
+    const socket = getSocket();
+    if (incomingCall && socket) {
+      socket.emit('decline-video-call', { bookingId: incomingCall.bookingId });
     }
     setIncomingCall(null);
   };
 
   const cancelCall = () => {
-    if (outgoingCall && window.socket) {
-      window.socket.emit('cancel-video-call', { bookingId: outgoingCall.bookingId });
+    const socket = getSocket();
+    if (outgoingCall && socket) {
+      socket.emit('cancel-video-call', { bookingId: outgoingCall.bookingId });
     }
     setOutgoingCall(null);
   };
+
 
   // Render Incoming Call Modal (for Student)
   if (incomingCall) {

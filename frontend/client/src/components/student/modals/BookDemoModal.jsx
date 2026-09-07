@@ -19,19 +19,34 @@ export const BookDemoModal = ({
   const [error, setError] = useState('');
   const [pendingWarning, setPendingWarning] = useState('');
 
+  const [selectedDemoSlot, setSelectedDemoSlot] = useState('');
+  const [selectedDemoDate, setSelectedDemoDate] = useState('');
+
   const isDemoUsed = isDemoCompletedForTutor(tutor, completedDemoTutorIds);
   const isDemoPending = isPendingDemoForTutor(tutor, pendingDemoTutorIds);
   const tutorName = tutor && tutor.user ? tutor.user.name || 'Tutor' : 'Tutor';
   const subjects = tutor && tutor.subjects ? tutor.subjects.join(', ') : 'General Subjects';
 
+  const demoDuration = tutor?.demoDuration || 60;
+  const availableDemoDays = Array.isArray(tutor?.demoAvailableDays) && tutor.demoAvailableDays.length > 0
+    ? tutor.demoAvailableDays
+    : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const availableDemoSlots = Array.isArray(tutor?.demoTimeSlots) && tutor.demoTimeSlots.length > 0
+    ? tutor.demoTimeSlots.map((s) => (typeof s === 'object' && s !== null ? s.slotLabel || `${s.startTime} – ${s.endTime}` : String(s)))
+    : ['05:00 PM – 06:00 PM', '06:00 PM – 07:00 PM', '07:00 PM – 08:00 PM'];
+
+  // Tomorrow date string in YYYY-MM-DD format
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
   useEffect(() => {
     if (isOpen) {
-      // Clear stale frontend error/warning state from previously opened tutor modals
       setError('');
       setAddress('');
       setMessage('');
       setIsHomeVisit(false);
       setLoading(false);
+      setSelectedDemoSlot(availableDemoSlots[0] || '05:00 PM – 06:00 PM');
+      setSelectedDemoDate(tomorrowStr);
 
       if (isDemoUsed) {
         setIsTrial(false);
@@ -60,6 +75,10 @@ export const BookDemoModal = ({
     setLoading(true);
     setError('');
 
+    const parts = selectedDemoSlot ? selectedDemoSlot.split(/[-–—]/).map((p) => p.trim()) : [];
+    const scheduledStartTime = parts[0] || '18:00';
+    const scheduledEndTime = parts[1] || '19:00';
+
     try {
       const resData = await studentApi.bookTutor({
         tutorProfileId: tutor ? tutor._id : null,
@@ -67,6 +86,10 @@ export const BookDemoModal = ({
         message,
         isHomeVisit,
         isTrial,
+        scheduledDate: selectedDemoDate ? new Date(selectedDemoDate) : new Date(Date.now() + 86400000),
+        scheduledStartTime,
+        scheduledEndTime,
+        demoSlot: selectedDemoSlot,
       });
 
       if (resData.success) {
@@ -142,6 +165,75 @@ export const BookDemoModal = ({
             </div>
           </div>
 
+          {/* DEMO CLASS SLOTS SELECTION (Only when isTrial === true) */}
+          {isTrial && (
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#0f2a4a' }}>
+                  <i className="fa-solid fa-calendar-check" style={{ color: '#0284c7', marginRight: '6px' }}></i> Choose Demo Date & Time Slot
+                </span>
+                <span style={{ background: '#e0f2fe', color: '#0284c7', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
+                  {demoDuration} Mins Duration
+                </span>
+              </div>
+
+              {/* AVAILABLE DAYS INFO */}
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                <strong>Tutor Available Days:</strong> {availableDemoDays.join(', ')}
+              </div>
+
+              {/* DATE PICKER */}
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                  Select Demo Date
+                </label>
+                <input
+                  type="date"
+                  min={tomorrowStr}
+                  className="tr-input"
+                  value={selectedDemoDate}
+                  onChange={(e) => setSelectedDemoDate(e.target.value)}
+                  required={isTrial}
+                  style={{ width: '100%', height: '38px', fontSize: '13px', padding: '0 10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* TIME SLOTS SELECTION */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  Select Tutor Demo Slot
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {availableDemoSlots.map((slot) => {
+                    const isSelected = selectedDemoSlot === slot;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setSelectedDemoSlot(slot)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: isSelected ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                          background: isSelected ? '#e0f2fe' : '#ffffff',
+                          color: isSelected ? '#0369a1' : '#475569',
+                          fontWeight: isSelected ? '800' : '600',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <i className="fa-regular fa-clock" style={{ fontSize: '11px', color: isSelected ? '#0284c7' : '#94a3b8' }}></i> {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{ marginBottom: '14px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
               <input type="checkbox" checked={isHomeVisit} onChange={(e) => setIsHomeVisit(e.target.checked)} />
@@ -168,7 +260,7 @@ export const BookDemoModal = ({
             <textarea
               className="tr-textarea"
               rows="3"
-              placeholder="Specify convenient days/times or topics you'd like to focus on..."
+              placeholder="Specify convenient topics you'd like to focus on during your demo..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             ></textarea>

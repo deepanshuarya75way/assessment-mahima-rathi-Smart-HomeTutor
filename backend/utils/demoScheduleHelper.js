@@ -53,8 +53,10 @@ exports.createDemoClassScheduleIfBothApproved = async (bookingId, app = null) =>
       subjectName = booking.tutorProfile.primarySubject;
     }
 
-    // Schedule for tomorrow at 18:00
-    const demoDate = new Date(Date.now() + 86400000);
+    // Use the exact date and slot configured or scheduled in booking
+    const demoDate = booking.scheduledDate || booking.date || new Date(Date.now() + 86400000);
+    const demoStartTime = booking.scheduledStartTime || "18:00";
+    const demoEndTime = booking.scheduledEndTime || "19:00";
 
     const newDemoSchedule = await ClassSchedule.create({
       tutor: booking.tutor._id || booking.tutor,
@@ -62,8 +64,8 @@ exports.createDemoClassScheduleIfBothApproved = async (bookingId, app = null) =>
       booking: booking._id,
       subject: subjectName,
       date: demoDate,
-      startTime: "18:00",
-      endTime: "19:00",
+      startTime: demoStartTime,
+      endTime: demoEndTime,
       frequency: "One-Time",
       days: "One-Time Session",
       mode: booking.isHomeVisit ? "Offline" : "Online",
@@ -80,15 +82,17 @@ exports.createDemoClassScheduleIfBothApproved = async (bookingId, app = null) =>
 
     const studentName = booking.student ? (booking.student.name || "Student") : "Student";
     const tutorName = booking.tutor ? (booking.tutor.name || "Tutor") : "Tutor";
-    const formattedDate = demoDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    const formattedDate = demoDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    const timeDisplay = demoEndTime ? `${demoStartTime} – ${demoEndTime}` : demoStartTime;
 
     // Notify Student
     if (booking.student) {
       await createNotification({
         userId: booking.student._id || booking.student,
         title: "Demo Class Scheduled! 🎉",
-        message: `Your 1-on-1 trial demo class with ${tutorName} for ${subjectName} is scheduled for ${formattedDate} at 06:00 PM (${newDemoSchedule.mode}).`,
+        message: `Your 1-on-1 trial demo class with ${tutorName} for ${subjectName} is confirmed for ${formattedDate} at ${timeDisplay} (${newDemoSchedule.mode}).`,
         type: "booking",
+        actionUrl: "/dashboard/student?tab=classes",
         app,
       });
     }
@@ -98,8 +102,9 @@ exports.createDemoClassScheduleIfBothApproved = async (bookingId, app = null) =>
       await createNotification({
         userId: booking.tutor._id || booking.tutor,
         title: "Demo Class Scheduled! 🎓",
-        message: `Demo class with ${studentName} for ${subjectName} is confirmed for ${formattedDate} at 06:00 PM (${newDemoSchedule.mode}).`,
+        message: `Demo class with ${studentName} for ${subjectName} is confirmed for ${formattedDate} at ${timeDisplay} (${newDemoSchedule.mode}).`,
         type: "booking",
+        actionUrl: "/dashboard/tutor?tab=sessions",
         app,
       });
     }
