@@ -33,8 +33,33 @@ const TUTOR_VALID_TABS = [
   'complaints',
 ];
 
+const TUTOR_TAB_ALIASES = {
+  'session': 'sessions',
+  'schedule': 'sessions',
+  'schedules': 'sessions',
+  'teaching-sessions': 'sessions',
+  'request': 'requests',
+  'demo-requests': 'requests',
+  'homework': 'assignments',
+  'notes': 'assignments',
+  'messages': 'chat',
+  'rates': 'rates-availability',
+  'availability': 'rates-availability',
+  'subjects': 'rates-availability',
+  'referral': 'referrals',
+  'profile': 'edit-profile',
+  'notification': 'notifications',
+  'complaint': 'complaints',
+  'support': 'complaints',
+};
+
 export const TutorDashboardPage = () => {
-  const [activeTab, setActiveTab] = useDashboardTab('tutor_activeTab', 'overview', TUTOR_VALID_TABS);
+  const [activeTab, setActiveTab] = useDashboardTab(
+    'tutor_activeTab',
+    'overview',
+    TUTOR_VALID_TABS,
+    TUTOR_TAB_ALIASES
+  );
   const [loading, setLoading] = useState(true);
   const [tutorStatus, setTutorStatus] = useState('not_applied');
   const [showApplicationForm, setShowApplicationForm] = useState(false);

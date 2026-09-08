@@ -18,6 +18,7 @@ import { SignupPage } from './pages/public/SignupPage';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { VerifyOtp } from './pages/auth/VerifyOtp';
 import { VideoCall } from './pages/video/VideoCall';
+import { AdminLoginPage } from './pages/admin/AdminLoginPage';
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
 import { TutorDashboardPage } from './pages/tutor/TutorDashboardPage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -46,6 +47,7 @@ export const App = () => {
           <Route path="/tutor/:id" element={<TutorProfile />} />
           <Route path="/become-a-tutor" element={<BecomeTutorPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin-panel" element={<AdminLoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-otp" element={<VerifyOtp />} />

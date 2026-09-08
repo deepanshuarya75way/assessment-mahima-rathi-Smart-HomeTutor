@@ -23,12 +23,28 @@ const PARENT_VALID_TABS = [
   'complaints',
 ];
 
+const PARENT_TAB_ALIASES = {
+  'find': 'search-tutors',
+  'tutors': 'search-tutors',
+  'find-tutors': 'search-tutors',
+  'invoice': 'invoices',
+  'billing': 'invoices',
+  'messages': 'chat',
+  'notification': 'notifications',
+  'complaint': 'complaints',
+};
+
 export const ParentDashboard = () => {
   const navigate = useNavigate();
   const { isAuth, userRole, userName, userEmail } = useAuth();
 
   // Navigation Tabs State ('overview' | 'notifications' | 'search-tutors' | 'invoices' | 'chat')
-  const [activeTab, setActiveTab] = useDashboardTab('parent_activeTab', 'overview', PARENT_VALID_TABS);
+  const [activeTab, setActiveTab] = useDashboardTab(
+    'parent_activeTab',
+    'overview',
+    PARENT_VALID_TABS,
+    PARENT_TAB_ALIASES
+  );
 
   // Modals State
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);

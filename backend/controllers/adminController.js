@@ -2087,3 +2087,279 @@ exports.deleteBookingRequest = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
+// ==========================================
+// ADMIN ACCESS MANAGEMENT CONTROLLERS
+// ==========================================
+
+exports.getAdminStaffList = async (req, res) => {
+  try {
+    const User = require("../models/User");
+    const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+
+    const adminUsers = await User.find({ role: "admin" }).select("-password").sort({ createdAt: -1 }).lean();
+
+    const formattedList = adminUsers.map((u) => {
+      const isSuper = Boolean(u.isSuperAdmin || u.email === superAdminEmail);
+      return {
+        _id: u._id,
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        isSuperAdmin: isSuper,
+        fullAccess: isSuper ? true : Boolean(u.fullAccess),
+        manageAccess: isSuper ? true : Boolean(u.manageAccess),
+        permissions: Array.isArray(u.permissions) ? u.permissions : [],
+        adminRoleName: isSuper ? "Super Admin" : (u.adminRoleName || (u.fullAccess ? "Admin Staff (Full Access)" : "Admin Staff")),
+        accountStatus: u.accountStatus || "Active",
+        createdAt: u.createdAt,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      adminStaff: formattedList,
+    });
+  } catch (err) {
+    console.error("Get Admin Staff List Error:", err);
+    return res.status(500).json({ success: false, message: "Server error fetching admin access list." });
+  }
+};
+
+exports.createAdminStaffAccess = async (req, res) => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const User = require("../models/User");
+
+    const { email, password, fullAccess, manageAccess, permissions } = req.body || {};
+
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ success: false, message: "Gmail / Email address is required." });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ success: false, message: "Please enter a valid email address format." });
+    }
+
+    let existingUser = await User.findOne({ email: normalizedEmail });
+
+    if (existingUser && existingUser.role === "admin" && existingUser.accountStatus !== "Discontinued") {
+      return res.status(400).json({ success: false, message: "Email already has Admin access." });
+    }
+
+    if (!existingUser && (!password || String(password).trim().length < 6)) {
+      return res.status(400).json({ success: false, message: "Password is required and must be at least 6 characters long." });
+    }
+
+    let permissionArray = Array.isArray(permissions) ? permissions.map((p) => String(p).trim()).filter(Boolean) : [];
+
+    if (permissionArray.includes("blogs.view") || permissionArray.includes("blogs") || permissionArray.includes("blog-articles")) {
+      const blogPerms = ["blogs.view", "blogs.create", "blogs.edit", "blogs.delete"];
+      blogPerms.forEach((bp) => {
+        if (!permissionArray.includes(bp)) permissionArray.push(bp);
+      });
+    }
+
+    const isFull = Boolean(fullAccess);
+    const isManage = Boolean(manageAccess);
+
+    if (!isFull && !isManage && permissionArray.length === 0) {
+      return res.status(400).json({ success: false, message: "Please select at least one Admin Dashboard section or Full Access." });
+    }
+
+    const rawPassword = password ? String(password).trim() : "";
+    const hashedPassword = rawPassword ? await bcrypt.hash(rawPassword, 10) : (existingUser ? existingUser.password : "");
+
+    let targetUser = existingUser;
+
+    if (targetUser) {
+      targetUser.role = "admin";
+      targetUser.accountStatus = "Active";
+      targetUser.isVerified = true;
+      if (rawPassword.length >= 6) {
+        targetUser.password = hashedPassword;
+        targetUser.mustChangePassword = true;
+      }
+      targetUser.fullAccess = isFull;
+      targetUser.manageAccess = isManage;
+      targetUser.permissions = permissionArray;
+      targetUser.adminRoleName = isFull ? "Admin Staff (Full Access)" : "Admin Staff";
+      await targetUser.save();
+    } else {
+      let newReferralCode = "ADM-" + Math.floor(1000 + Math.random() * 9000);
+      targetUser = await User.create({
+        name: normalizedEmail.split("@")[0],
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: "admin",
+        isSuperAdmin: false,
+        fullAccess: isFull,
+        manageAccess: isManage,
+        permissions: permissionArray,
+        adminRoleName: isFull ? "Admin Staff (Full Access)" : "Admin Staff",
+        isVerified: true,
+        accountStatus: "Active",
+        mustChangePassword: true,
+        referralCode: newReferralCode,
+      });
+    }
+
+    await logUserActivity(req.user.id, `Created admin access for ${normalizedEmail} with role Admin Staff`, req.ip);
+
+    // Verify user exists in database before sending confirmation email to exact target recipient
+    const confirmedDbUser = await User.findById(targetUser._id);
+    if (confirmedDbUser) {
+      const { sendAdminAccessConfirmationEmail } = require("../utils/sendEmail");
+      sendAdminAccessConfirmationEmail({
+        to: confirmedDbUser.email,
+        name: confirmedDbUser.name,
+        loginEmail: confirmedDbUser.email,
+        tempPassword: rawPassword,
+        permissions: confirmedDbUser.permissions,
+        fullAccess: confirmedDbUser.fullAccess,
+      }).catch((emailErr) => {
+        console.error(`❌ Admin Access confirmation email error for ${confirmedDbUser.email}:`, emailErr.message);
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Admin access created successfully.",
+      user: {
+        id: targetUser._id,
+        email: targetUser.email,
+        role: targetUser.role,
+        fullAccess: targetUser.fullAccess,
+        manageAccess: targetUser.manageAccess,
+        permissions: targetUser.permissions,
+        adminRoleName: targetUser.adminRoleName,
+      },
+    });
+  } catch (err) {
+    console.error("Create Admin Access Error:", err);
+    return res.status(500).json({ success: false, message: "Server error creating admin access." });
+  }
+};
+
+exports.updateAdminStaffAccess = async (req, res) => {
+  try {
+    const bcrypt = require("bcryptjs");
+    const User = require("../models/User");
+    const { id } = req.params;
+    const { password, fullAccess, manageAccess, permissions } = req.body || {};
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "Admin staff account not found." });
+    }
+
+    const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+    if (targetUser.isSuperAdmin || targetUser.email === superAdminEmail) {
+      if (req.user.email !== superAdminEmail) {
+        return res.status(403).json({ success: false, message: "Access Denied: Cannot modify Super Admin account." });
+      }
+    }
+
+    let permissionArray = Array.isArray(permissions) ? permissions.map((p) => String(p).trim()).filter(Boolean) : [];
+
+    if (permissionArray.includes("blogs.view") || permissionArray.includes("blogs") || permissionArray.includes("blog-articles")) {
+      const blogPerms = ["blogs.view", "blogs.create", "blogs.edit", "blogs.delete"];
+      blogPerms.forEach((bp) => {
+        if (!permissionArray.includes(bp)) permissionArray.push(bp);
+      });
+    }
+
+    const isFull = Boolean(fullAccess);
+    const isManage = Boolean(manageAccess);
+
+    if (!isFull && !isManage && permissionArray.length === 0 && !targetUser.isSuperAdmin) {
+      return res.status(400).json({ success: false, message: "Please select at least one Admin Dashboard section or Full Access." });
+    }
+
+    let updatedRawPassword = null;
+    if (password && String(password).trim().length >= 6) {
+      updatedRawPassword = String(password).trim();
+      targetUser.password = await bcrypt.hash(updatedRawPassword, 10);
+      targetUser.mustChangePassword = true;
+    }
+
+    if (!targetUser.isSuperAdmin) {
+      targetUser.fullAccess = isFull;
+      targetUser.manageAccess = isManage;
+      targetUser.permissions = permissionArray;
+      targetUser.adminRoleName = isFull ? "Admin Staff (Full Access)" : "Admin Staff";
+    }
+
+    await targetUser.save();
+    await logUserActivity(req.user.id, `Updated admin access permissions for ${targetUser.email}`, req.ip);
+
+    // Verify user exists in database before sending confirmation email to exact target recipient
+    const confirmedDbUser = await User.findById(targetUser._id);
+    if (confirmedDbUser) {
+      const { sendAdminAccessConfirmationEmail } = require("../utils/sendEmail");
+      sendAdminAccessConfirmationEmail({
+        to: confirmedDbUser.email,
+        name: confirmedDbUser.name,
+        loginEmail: confirmedDbUser.email,
+        tempPassword: updatedRawPassword,
+        permissions: confirmedDbUser.permissions,
+        fullAccess: confirmedDbUser.fullAccess,
+      }).catch((emailErr) => {
+        console.error(`❌ Admin Access update email error for ${confirmedDbUser.email}:`, emailErr.message);
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Permissions updated successfully.",
+      user: {
+        id: targetUser._id,
+        email: targetUser.email,
+        fullAccess: targetUser.fullAccess,
+        manageAccess: targetUser.manageAccess,
+        permissions: targetUser.permissions,
+        adminRoleName: targetUser.adminRoleName,
+      },
+    });
+  } catch (err) {
+    console.error("Update Admin Staff Access Error:", err);
+    return res.status(500).json({ success: false, message: "Server error updating permissions." });
+  }
+};
+
+exports.revokeAdminStaffAccess = async (req, res) => {
+  try {
+    const User = require("../models/User");
+    const { id } = req.params;
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "Admin staff account not found." });
+    }
+
+    const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+    if (targetUser.isSuperAdmin || targetUser.email === superAdminEmail) {
+      return res.status(403).json({ success: false, message: "Access Denied: Cannot revoke Super Admin account." });
+    }
+
+    targetUser.fullAccess = false;
+    targetUser.manageAccess = false;
+    targetUser.permissions = [];
+    targetUser.accountStatus = "Discontinued";
+    await targetUser.save();
+
+    await logUserActivity(req.user.id, `Revoked admin access for ${targetUser.email}`, req.ip);
+
+    return res.status(200).json({
+      success: true,
+      message: "Admin access revoked successfully.",
+    });
+  } catch (err) {
+    console.error("Revoke Admin Staff Access Error:", err);
+    return res.status(500).json({ success: false, message: "Server error revoking admin access." });
+  }
+};
+

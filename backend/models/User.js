@@ -182,6 +182,39 @@ const userSchema = new mongoose.Schema(
         }
       }
     ],
+
+    // ADMIN ACCESS MANAGEMENT PERMISSIONS
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+    },
+
+    fullAccess: {
+      type: Boolean,
+      default: false,
+    },
+
+    manageAccess: {
+      type: Boolean,
+      default: false,
+    },
+
+    permissions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+
+    adminRoleName: {
+      type: String,
+      default: "Admin Staff",
+    },
+
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

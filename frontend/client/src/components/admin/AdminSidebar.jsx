@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 export const AdminSidebar = ({
   activeTab,
@@ -10,6 +11,12 @@ export const AdminSidebar = ({
   isOpenMobile,
   onCloseMobile,
 }) => {
+  const auth = useAuth();
+  const isSuper = Boolean(auth.isSuperAdmin || (auth.userEmail === 'useradmin2005@gmail.com'));
+  const isFull = isSuper || Boolean(auth.fullAccess);
+  const userPerms = Array.isArray(auth.permissions) ? auth.permissions : [];
+  const roleBadgeText = auth.adminRoleName || (isSuper ? 'Super Admin' : (isFull ? 'Admin Staff (Full)' : 'Admin Staff'));
+
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -68,20 +75,31 @@ export const AdminSidebar = ({
     if (onCloseMobile) onCloseMobile();
   };
 
-  const navItems = [
-    { id: 'overview', label: 'Overview & Metrics', icon: 'fa-gauge' },
-    { id: 'demo-requests', label: 'Demo Class Requests', icon: 'fa-calendar-check' },
-    { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badge: unreadCount },
-    { id: 'users', label: 'User Directory', icon: 'fa-users-gear' },
-    { id: 'tutor-verifications', label: 'Tutor Verifications', icon: 'fa-shield-check' },
-    { id: 'certificates', label: 'Certificate Approvals', icon: 'fa-award' },
-    { id: 'finance', label: 'Finance & Revenue', icon: 'fa-sack-dollar' },
-    { id: 'payment-history', label: 'Payment History', icon: 'fa-clock-rotate-left' },
-    { id: 'catalog', label: 'Catalog & Boards', icon: 'fa-layer-group' },
-    { id: 'disputes', label: 'Disputes & Complaints', icon: 'fa-scale-balanced' },
-    { id: 'newsletter', label: 'Newsletter Subscribers', icon: 'fa-envelope-open-text' },
-    { id: 'blogs', label: 'Blog Articles', icon: 'fa-newspaper' },
+  const allNavItems = [
+    { id: 'overview', label: 'Overview & Metrics', icon: 'fa-gauge', permKey: 'overview.view' },
+    { id: 'demo-requests', label: 'Demo Class Requests', icon: 'fa-calendar-check', permKey: 'demo-requests.manage' },
+    { id: 'notifications', label: 'Notifications', icon: 'fa-bell', badge: unreadCount, permKey: 'notifications.manage' },
+    { id: 'users', label: 'User Directory', icon: 'fa-users-gear', permKey: 'users.manage' },
+    { id: 'tutor-verifications', label: 'Tutor Verifications', icon: 'fa-shield-check', permKey: 'tutor-verifications.manage' },
+    { id: 'certificates', label: 'Certificate Approvals', icon: 'fa-award', permKey: 'certificates.manage' },
+    { id: 'finance', label: 'Finance & Revenue', icon: 'fa-sack-dollar', permKey: 'finance.view' },
+    { id: 'payment-history', label: 'Payment History', icon: 'fa-clock-rotate-left', permKey: 'payment-history.view' },
+    { id: 'catalog', label: 'Catalog & Boards', icon: 'fa-layer-group', permKey: 'catalog.manage' },
+    { id: 'disputes', label: 'Disputes & Complaints', icon: 'fa-scale-balanced', permKey: 'disputes.manage' },
+    { id: 'newsletter', label: 'Newsletter Subscribers', icon: 'fa-envelope-open-text', permKey: 'newsletter.manage' },
+    { id: 'blogs', label: 'Blog Articles', icon: 'fa-newspaper', permKey: 'blogs.view' },
+    { id: 'manage-access', label: 'Manage Access', icon: 'fa-user-lock', permKey: 'manageAccess' },
   ];
+
+  const visibleNavItems = allNavItems.filter((item) => {
+    if (item.id === 'manage-access') return isSuper;
+    if (isSuper) return true;
+    if (isFull) return true;
+    if (item.id === 'blogs') {
+      return userPerms.includes('blogs.view') || userPerms.includes('blogs') || userPerms.includes('blog-articles');
+    }
+    return userPerms.includes(item.permKey);
+  });
 
   return (
     <aside className={`dashboard-sidebar ${isOpenMobile ? 'mobile-open' : ''}`}>
@@ -104,13 +122,13 @@ export const AdminSidebar = ({
           <div className="user-info">
             <h4 title={adminName || 'System Administrator'}>{adminName || 'System Administrator'}</h4>
             <p title={adminEmail || 'admin@hometutor.com'}>{adminEmail || 'admin@hometutor.com'}</p>
-            <span className="role-badge badge-admin">Super Admin</span>
+            <span className="role-badge badge-admin">{roleBadgeText}</span>
           </div>
         </div>
 
         <div className="sidebar-menu-title">Admin Management</div>
         <ul className="sidebar-menu">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <li
               key={item.id}
               className={`dash-tab-btn ${activeTab === item.id ? 'active' : ''}`}
@@ -129,24 +147,33 @@ export const AdminSidebar = ({
           ))}
         </ul>
 
-        <div className="sidebar-menu-title" style={{ marginTop: '24px' }}>Security & Broadcasts</div>
-        <ul className="sidebar-menu">
-          <li>
-            <a href="#announcements" onClick={(e) => { e.preventDefault(); onOpenAnnouncement(); if (onCloseMobile) onCloseMobile(); }}>
-              <i className="fa-solid fa-bullhorn"></i> Send Announcement
-            </a>
-          </li>
-          <li>
-            <a href="#security" onClick={(e) => { e.preventDefault(); onOpenSecurityCenter(); if (onCloseMobile) onCloseMobile(); }}>
-              <i className="fa-solid fa-shield-halved"></i> Security Center
-            </a>
-          </li>
-        </ul>
+        {isSuper && (
+          <>
+            <div className="sidebar-menu-title" style={{ marginTop: '24px' }}>Security & Broadcasts</div>
+            <ul className="sidebar-menu">
+              <li>
+                <a href="#announcements" onClick={(e) => { e.preventDefault(); onOpenAnnouncement(); if (onCloseMobile) onCloseMobile(); }}>
+                  <i className="fa-solid fa-bullhorn"></i> Send Announcement
+                </a>
+              </li>
+              <li>
+                <a href="#security" onClick={(e) => { e.preventDefault(); onOpenSecurityCenter(); if (onCloseMobile) onCloseMobile(); }}>
+                  <i className="fa-solid fa-shield-halved"></i> Security Center
+                </a>
+              </li>
+            </ul>
+          </>
+        )}
       </div>
 
       <div className="sidebar-role-switch">
         <a
           href="/logout"
+          onClick={(e) => {
+            e.preventDefault();
+            localStorage.removeItem('admin_activeTab');
+            window.location.href = '/logout';
+          }}
           className="dash-btn dash-btn-outline"
           style={{ width: '100%', justifyContent: 'center', color: '#dc2626', borderColor: '#fca5a5', background: '#fee2e2' }}
         >

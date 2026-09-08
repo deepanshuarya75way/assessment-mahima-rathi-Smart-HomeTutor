@@ -241,9 +241,12 @@ app.post("/signup", authController.signup);
 app.get("/logout", authController.logout);
 
 // Public View Routes
-app.get(["/", "/about", "/privacy-policy", "/terms-of-service", "/forgot-password", "/verify-otp", "/video-call", "/video-call/:bookingId", "/blog/:idOrSlug", "/blogs", "/find", "/contact", "/subjects", "/subjects/:subjectSlug", "/tutor", "/tutor/:id", "/tutr", "/become-a-tutor", "/login", "/signup"], (req, res) => {
+app.get(["/", "/about", "/privacy-policy", "/terms-of-service", "/forgot-password", "/verify-otp", "/video-call", "/video-call/:bookingId", "/blog/:idOrSlug", "/blogs", "/find", "/contact", "/subjects", "/subjects/:subjectSlug", "/tutor", "/tutor/:id", "/tutr", "/become-a-tutor", "/login", "/signup", "/admin-panel"], (req, res) => {
   if ((req.path === "/login" || req.path === "/signup") && res.locals.isAuth && res.locals.userRole) {
     return res.redirect(`/dashboard/${res.locals.userRole}`);
+  }
+  if (req.path === "/admin-panel" && res.locals.isAuth && res.locals.userRole === "admin") {
+    return res.redirect("/dashboard/admin");
   }
   res.render("index");
 });

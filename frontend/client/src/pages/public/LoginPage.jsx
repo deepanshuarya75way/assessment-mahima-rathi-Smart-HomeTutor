@@ -112,7 +112,6 @@ export const LoginPage = () => {
     { id: 'student', label: 'Student', icon: 'fa-user-graduate' },
     { id: 'tutor', label: 'Tutor', icon: 'fa-chalkboard-user' },
     { id: 'parent', label: 'Parent', icon: 'fa-users' },
-    { id: 'admin', label: 'Admin', icon: 'fa-user-shield' },
   ];
 
   return (
@@ -127,7 +126,7 @@ export const LoginPage = () => {
               <span className="lg-tag">SECURE ROLE AUTHENTICATION</span>
               <h1>Access Your Dedicated Panel</h1>
               <p>
-                Please select your designated role (Student, Tutor, Parent, or Admin) before logging in. Your panel access is authenticated based on your role.
+                Please select your designated role (Student, Tutor, or Parent) before logging in. Your panel access is authenticated based on your role.
               </p>
 
               <div className="lg-shield-box">

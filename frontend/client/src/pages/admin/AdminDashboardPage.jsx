@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../../styles/admin-dashboard.css';
+import { useAuth } from '../../context/AuthContext';
 import { adminApi } from '../../services/adminApi';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
 import { AdminHeaderBar } from '../../components/admin/AdminHeaderBar';
@@ -15,6 +16,7 @@ import { AdminNewsletterTab } from '../../components/admin/tabs/AdminNewsletterT
 import { AdminBlogsTab } from '../../components/admin/tabs/AdminBlogsTab';
 import { AdminNotificationsTab } from '../../components/admin/tabs/AdminNotificationsTab';
 import { AdminDemoRequestsTab } from '../../components/admin/tabs/AdminDemoRequestsTab';
+import { AdminAccessManagementTab } from '../../components/admin/tabs/AdminAccessManagementTab';
 import { AnnouncementModal } from '../../components/admin/modals/AnnouncementModal';
 import { SecurityCenterModal } from '../../components/admin/modals/SecurityCenterModal';
 import { AddSubjectModal } from '../../components/admin/modals/AddSubjectModal';
@@ -35,10 +37,73 @@ const ADMIN_VALID_TABS = [
   'disputes',
   'newsletter',
   'blogs',
+  'manage-access',
 ];
 
+const ADMIN_TAB_ALIASES = {
+  'demos': 'demo-requests',
+  'verifications': 'tutor-verifications',
+  'tutor-apps': 'tutor-verifications',
+  'payments': 'payment-history',
+  'boards': 'catalog',
+  'dispute': 'disputes',
+  'complaints': 'disputes',
+  'blog': 'blogs',
+  'articles': 'blogs',
+  'notification': 'notifications',
+  'user-directory': 'users',
+  'access': 'manage-access',
+  'manage': 'manage-access',
+  'access-management': 'manage-access',
+  'admin-access': 'manage-access',
+};
+
 export const AdminDashboardPage = () => {
-  const [activeTab, setActiveTab] = useDashboardTab('admin_activeTab', 'overview', ADMIN_VALID_TABS);
+  const auth = useAuth();
+  const [activeTab, setActiveTab] = useDashboardTab(
+    'admin_activeTab',
+    'overview',
+    ADMIN_VALID_TABS,
+    ADMIN_TAB_ALIASES
+  );
+
+  const isSuper = Boolean(auth?.isSuperAdmin || (auth?.userEmail === 'useradmin2005@gmail.com'));
+  const isFull = isSuper || Boolean(auth?.fullAccess);
+  const userPerms = Array.isArray(auth?.permissions) ? auth.permissions : [];
+
+  const isTabAllowed = (tabId) => {
+    if (tabId === 'manage-access') return isSuper;
+    if (isSuper) return true;
+    if (isFull) return true;
+    if (tabId === 'blogs') {
+      return userPerms.includes('blogs.view') || userPerms.includes('blogs') || userPerms.includes('blog-articles');
+    }
+    const permMap = {
+      'overview': 'overview.view',
+      'demo-requests': 'demo-requests.manage',
+      'notifications': 'notifications.manage',
+      'users': 'users.manage',
+      'tutor-verifications': 'tutor-verifications.manage',
+      'certificates': 'certificates.manage',
+      'finance': 'finance.view',
+      'payment-history': 'payment-history.view',
+      'catalog': 'catalog.manage',
+      'disputes': 'disputes.manage',
+      'newsletter': 'newsletter.manage',
+    };
+    return userPerms.includes(permMap[tabId]);
+  };
+
+  useEffect(() => {
+    if (!auth.loading) {
+      if (!isTabAllowed(activeTab)) {
+        const firstAllowed = ADMIN_VALID_TABS.find((t) => isTabAllowed(t));
+        if (firstAllowed) {
+          setActiveTab(firstAllowed);
+        }
+      }
+    }
+  }, [activeTab, auth.loading, auth.isSuperAdmin, auth.fullAccess, auth.permissions]);
   const [loading, setLoading] = useState(true);
 
   // Dynamic MongoDB Data States
@@ -328,8 +393,8 @@ export const AdminDashboardPage = () => {
       <AdminSidebar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
-        adminName="System Administrator"
-        adminEmail="useradmin2005@gmail.com"
+        adminName={auth?.userName || 'System Administrator'}
+        adminEmail={auth?.userEmail || 'useradmin2005@gmail.com'}
         onOpenAnnouncement={() => setIsAnnouncementOpen(true)}
         onOpenSecurityCenter={() => setIsSecurityCenterOpen(true)}
         isOpenMobile={isMobileMenuOpen}
@@ -345,10 +410,8 @@ export const AdminDashboardPage = () => {
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
-
-
         {/* TAB RENDERING */}
-        {loading ? (
+        {auth.loading || loading ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
             <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: '32px', color: '#b45309', marginBottom: '12px' }}></i>
             <p style={{ fontSize: '15px', fontWeight: '600' }}>Loading Platform Governance Panel...</p>
@@ -436,6 +499,10 @@ export const AdminDashboardPage = () => {
                 onTogglePublish={handleTogglePublishBlog}
                 onDeleteBlog={handleDeleteBlog}
               />
+            )}
+
+            {activeTab === 'manage-access' && isSuper && (
+              <AdminAccessManagementTab />
             )}
           </>
         )}

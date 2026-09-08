@@ -27,19 +27,43 @@ import { useDashboardTab } from '../../hooks/useDashboardTab';
 
 const STUDENT_VALID_TABS = [
   'overview',
-  'find',
   'my-tutors',
-  'requests',
-  'referral',
+  'notifications',
+  'search-tutors',
+  'schedule',
   'learning',
   'chat',
   'payments',
   'complaints',
   'settings',
+  'referral',
 ];
 
+const STUDENT_TAB_ALIASES = {
+  'find': 'search-tutors',
+  'find-tutors': 'search-tutors',
+  'scheduled': 'schedule',
+  'schedules': 'schedule',
+  'requests': 'schedule',
+  'tutors': 'my-tutors',
+  'messages': 'chat',
+  'wallet': 'payments',
+  'billing': 'payments',
+  'payment': 'payments',
+  'homework': 'learning',
+  'notes': 'learning',
+  'notification': 'notifications',
+  'complaint': 'complaints',
+  'referrals': 'referral',
+};
+
 export const StudentDashboardPage = () => {
-  const [activeTab, setActiveTab] = useDashboardTab('student_activeTab', 'overview', STUDENT_VALID_TABS);
+  const [activeTab, setActiveTab] = useDashboardTab(
+    'student_activeTab',
+    'overview',
+    STUDENT_VALID_TABS,
+    STUDENT_TAB_ALIASES
+  );
   const [studentUser, setStudentUser] = useState(null);
   const [statsData, setStatsData] = useState(null);
   const [tutors, setTutors] = useState([]);

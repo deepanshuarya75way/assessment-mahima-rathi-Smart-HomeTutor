@@ -11,6 +11,14 @@ exports.createClassSchedule = async (req, res) => {
   try {
     const { studentId, tutorId: requestedTutorId, bookingId, subject, frequency, days, date, startTime, endTime, mode } = req.body;
     
+    if (req.user.role === "admin") {
+      const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+      const isSuper = Boolean(req.user.isSuperAdmin || req.user.email === superAdminEmail);
+      if (!isSuper) {
+        return res.status(403).json({ success: false, message: "Access Denied: Only Super Admin can schedule classes from Admin Panel." });
+      }
+    }
+
     // Admin can specify tutorId, while Tutor uses their own User ID
     const tutorId = req.user.role === "admin" ? (requestedTutorId || req.user.id) : req.user.id;
 

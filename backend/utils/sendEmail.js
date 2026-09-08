@@ -248,9 +248,186 @@ const sendEmailWithAttachment = async ({ to, subject, html, text, attachments = 
   }
 };
 
+/**
+ * Send Admin Access Confirmation email to the target staff member
+ * @param {Object} options
+ * @param {string} options.to - Recipient target Gmail/email address
+ * @param {string} [options.name] - Staff member name
+ * @param {string} [options.loginEmail] - Target login email
+ * @param {string} [options.tempPassword] - Temporary password set by Super Admin (in-memory only)
+ * @param {Array}  [options.permissions] - Granted permissions
+ * @param {boolean} [options.fullAccess] - Whether full access was granted
+ */
+const sendAdminAccessConfirmationEmail = async ({ to, name, loginEmail, tempPassword, permissions = [], fullAccess = false }) => {
+  const normalizedEmail = String(to || loginEmail).toLowerCase().trim();
+
+  if (!isValidEmailFormat(normalizedEmail)) {
+    throw new Error("Invalid recipient email address.");
+  }
+
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT) || 587;
+  const user = process.env.SMTP_USER || "";
+  const pass = process.env.SMTP_PASS || "";
+  const from = process.env.EMAIL_FROM || `"Smart HomeTutor Governance" <${user}>`;
+  const adminLoginUrl = process.env.ADMIN_LOGIN_URL || (process.env.CLIENT_URL ? `${process.env.CLIENT_URL}/admin-panel` : "http://localhost:5000/admin-panel");
+
+  console.log(`📧 [ADMIN ACCESS EMAIL GENERATED] Recipient Target Gmail: ${normalizedEmail}`);
+
+  const sectionLabelsMap = {
+    "overview.view": "Overview & Metrics",
+    "demo-requests.manage": "Demo Class Requests",
+    "notifications.manage": "Notifications",
+    "users.manage": "User Directory",
+    "tutor-verifications.manage": "Tutor Verifications",
+    "certificates.manage": "Certificate Approvals",
+    "finance.view": "Finance & Revenue",
+    "payment-history.view": "Payment History",
+    "catalog.manage": "Catalog & Boards",
+    "disputes.manage": "Disputes & Complaints",
+    "newsletter.manage": "Newsletter Subscribers",
+  };
+
+  let accessHtml = "";
+  let accessText = "";
+
+  if (fullAccess) {
+    accessHtml = `<div style="font-weight: 700; color: #0f2a4a; font-size: 15px;">• Full Admin Dashboard Access</div>`;
+    accessText = `• Full Admin Dashboard Access`;
+  } else {
+    const hasBlogAccess = permissions.some((p) =>
+      ["blogs.view", "blogs.create", "blogs.edit", "blogs.delete", "blogs", "blog-articles"].includes(p)
+    );
+
+    let htmlBlocks = [];
+    let textBlocks = [];
+
+    if (hasBlogAccess) {
+      htmlBlocks.push(`
+        <div style="margin-bottom: 10px;">
+          <div style="font-weight: 700; color: #0f2a4a; font-size: 15px;">• Blog Articles</div>
+          <ul style="margin: 4px 0 0 18px; padding: 0; color: #334155; font-size: 13px; line-height: 1.6;">
+            <li>View</li>
+            <li>Create</li>
+            <li>Edit</li>
+            <li>Delete</li>
+          </ul>
+        </div>
+      `);
+      textBlocks.push(`• Blog Articles\n  - View\n  - Create\n  - Edit\n  - Delete`);
+    }
+
+    // Other non-blog sections
+    const nonBlogPerms = permissions.filter(
+      (p) => !["blogs.view", "blogs.create", "blogs.edit", "blogs.delete", "blogs", "blog-articles"].includes(p)
+    );
+
+    const sectionNames = nonBlogPerms
+      .map((p) => sectionLabelsMap[p] || p)
+      .filter((val, index, self) => self.indexOf(val) === index);
+
+    sectionNames.forEach((sec) => {
+      htmlBlocks.push(`<div style="font-weight: 600; color: #0f2a4a; font-size: 14px; margin-bottom: 6px;">• ${sec}</div>`);
+      textBlocks.push(`• ${sec}`);
+    });
+
+    if (htmlBlocks.length === 0) {
+      htmlBlocks.push(`<div style="font-weight: 600; color: #0f2a4a;">• Assigned Admin Staff Permissions</div>`);
+      textBlocks.push(`• Assigned Admin Staff Permissions`);
+    }
+
+    accessHtml = htmlBlocks.join("\n");
+    accessText = textBlocks.join("\n");
+  }
+
+  const isPlaceholder = !user || !pass || pass === "app_password_placeholder";
+
+  if (isPlaceholder) {
+    console.warn(`⚠️ SMTP credentials placeholder detected. Simulating admin access confirmation email delivery for target recipient ${normalizedEmail}.`);
+    return { success: true, isDevConsole: true, messageId: "dev-console-admin-access-email" };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false },
+  });
+
+  const displayName = name || normalizedEmail.split("@")[0];
+
+  const mailOptions = {
+    from,
+    to: normalizedEmail,
+    subject: "Admin Access Granted",
+    text: `Subject: Admin Access Granted\n\nHello ${displayName},\n\nYou have been granted Admin Staff access.\n\nAccess Granted:\n${accessText}\n\nLogin Email:\n${normalizedEmail}\n\nTemporary Password:\n${tempPassword || "(Unchanged)"}\n\nAdmin Login:\n${adminLoginUrl}\n\nFor security, you are required to change this temporary password after your first login.`,
+    html: `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 25px; border: 1px solid #cbd5e1; border-radius: 12px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #0f2a4a; font-size: 24px; margin: 0;">Smart HomeTutor</h2>
+          <p style="color: #0284c7; font-size: 14px; margin-top: 4px; font-weight: 700;">Admin Access Granted</p>
+        </div>
+
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+          <p style="color: #334155; font-size: 15px; margin: 0 0 10px 0;">Hello <strong>${displayName}</strong>,</p>
+          <p style="color: #475569; font-size: 14px; margin: 0 0 15px 0;">
+            You have been granted Admin Staff access.
+          </p>
+
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #0f2a4a; font-weight: 700;">Access Granted:</p>
+            ${accessHtml}
+          </div>
+
+          <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #64748b; font-weight: 600;">Login Email:</p>
+            <p style="margin: 0 0 12px 0; font-size: 15px; color: #0f2a4a; font-weight: 700; font-family: monospace;">${normalizedEmail}</p>
+
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #64748b; font-weight: 600;">Temporary Password:</p>
+            ${tempPassword ? `
+            <p style="margin: 0 0 8px 0; font-size: 16px; color: #dc2626; font-weight: 800; font-family: monospace; letter-spacing: 1px;">${tempPassword}</p>
+            ` : `
+            <p style="margin: 0 0 8px 0; font-size: 14px; color: #475569; font-style: italic;">(Unchanged - use existing password)</p>
+            `}
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; font-weight: 600;">Admin Login:</p>
+            <a href="${adminLoginUrl}" style="background: #0284c7; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; word-break: break-all;">
+              ${adminLoginUrl}
+            </a>
+          </div>
+
+          <div style="background: #fffbe6; border-left: 4px solid #d97706; padding: 12px 16px; border-radius: 6px; margin-top: 15px;">
+            <p style="margin: 0; font-size: 13px; color: #92400e; font-weight: 600;">
+              🔒 Security Notice: For security, you are required to change this temporary password after your first login.
+            </p>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; color: #94a3b8; font-size: 12px;">
+          &copy; 2026 Smart HomeTutor Governance System. All rights reserved.
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    console.log(`📤 [EMAIL SERVICE] Delivering Admin Access confirmation email to target recipient: ${normalizedEmail}...`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ [EMAIL SERVICE SUCCESS] Admin Access Confirmation Email Sent via Nodemailer to target Gmail:", info.messageId || info.response);
+    return info;
+  } catch (err) {
+    console.error("❌ [EMAIL SERVICE ERROR] Admin Access email delivery failed:", err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   isValidEmailFormat,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendEmailWithAttachment,
+  sendAdminAccessConfirmationEmail,
 };

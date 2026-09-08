@@ -10,16 +10,21 @@ const { sendVerificationEmail, sendPasswordResetEmail, isValidEmailFormat } = re
 
 const getJwtSecret = () => process.env.JWT_SECRET || "HomeTutor_Secret_Key_2026";
 const sendTokenResponse = (user, statusCode, req, res) => {
-  const token = jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      name: user.name || user.email.split("@")[0],
-      role: user.role,
-    },
-    getJwtSecret(),
-    { expiresIn: "1d" }
-  );
+  const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+  const isSuper = Boolean(user.isSuperAdmin || user.email === superAdminEmail);
+
+  const tokenPayload = {
+    id: user._id,
+    email: user.email,
+    name: user.name || user.email.split("@")[0],
+    role: user.role,
+    isSuperAdmin: isSuper,
+    fullAccess: isSuper ? true : Boolean(user.fullAccess),
+    manageAccess: isSuper,
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
+  };
+
+  const token = jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: "1d" });
 
   const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https";
 
@@ -44,6 +49,12 @@ const sendTokenResponse = (user, statusCode, req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isSuperAdmin: isSuper,
+        fullAccess: isSuper ? true : Boolean(user.fullAccess),
+        manageAccess: isSuper,
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+        adminRoleName: user.adminRoleName || (isSuper ? "Super Admin" : "Admin Staff"),
+        mustChangePassword: Boolean(user.mustChangePassword),
         tutorStatus: user.role === "tutor" ? (user.tutorStatus || "not_applied") : undefined,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,
@@ -423,6 +434,12 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = async (req, res) => {
+  const isAdmin = Boolean(
+    (req.user && req.user.role === "admin") ||
+    (req.query && req.query.from === "admin") ||
+    (req.headers && req.headers.referer && req.headers.referer.includes("admin"))
+  );
+
   if (req.user && req.user.id) {
     await logUserActivity({ userId: req.user.id, action: "User logged out", ipAddress: req.ip, severity: "info", category: "auth" });
   }
@@ -430,7 +447,9 @@ exports.logout = async (req, res) => {
   if (req.xhr || req.headers["content-type"]?.includes("json")) {
     return res.status(200).json({ success: true, message: "Logged out successfully" });
   }
-  return res.redirect("/login?message=" + encodeURIComponent("You have been logged out successfully."));
+
+  const redirectTarget = isAdmin ? "/admin-panel" : "/login";
+  return res.redirect(`${redirectTarget}?message=` + encodeURIComponent("You have been logged out successfully."));
 };
 
 
@@ -684,6 +703,10 @@ exports.getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User account not found." });
     }
+
+    const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+    const isSuper = Boolean(user.isSuperAdmin || user.email === superAdminEmail);
+
     return res.status(200).json({
       success: true,
       user: {
@@ -692,6 +715,11 @@ exports.getMe = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        isSuperAdmin: isSuper,
+        fullAccess: isSuper ? true : Boolean(user.fullAccess),
+        manageAccess: isSuper,
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+        adminRoleName: user.adminRoleName || (isSuper ? "Super Admin" : "Admin Staff"),
         tutorStatus: user.role === "tutor" ? (user.tutorStatus || "not_applied") : undefined,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,

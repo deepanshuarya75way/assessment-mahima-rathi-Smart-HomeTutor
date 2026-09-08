@@ -25,6 +25,10 @@ const connectDB = async () => {
         email: adminEmail,
         password: hashedPassword,
         role: "admin",
+        isSuperAdmin: true,
+        fullAccess: true,
+        manageAccess: true,
+        adminRoleName: "Super Admin",
         isVerified: true,
       });
     } else {
@@ -35,6 +39,13 @@ const connectDB = async () => {
       }
       if (!admin.isVerified) {
         admin.isVerified = true;
+        updated = true;
+      }
+      if (!admin.isSuperAdmin) {
+        admin.isSuperAdmin = true;
+        admin.fullAccess = true;
+        admin.manageAccess = true;
+        admin.adminRoleName = "Super Admin";
         updated = true;
       }
       const isMatch = await bcrypt.compare("admin123", admin.password);

@@ -16,6 +16,10 @@ const seedAdminAccount = async () => {
         email: adminEmail,
         password: hashedPassword,
         role: "admin",
+        isSuperAdmin: true,
+        fullAccess: true,
+        manageAccess: true,
+        adminRoleName: "Super Admin",
         isVerified: true,
         walletBalance: 0,
         referralCode: "ADMIN-2026",
@@ -23,9 +27,23 @@ const seedAdminAccount = async () => {
 
       console.log(`✅ Default Admin Account Initialized (${adminEmail})`);
     } else {
-      if (existingAdmin.role !== "admin" || !existingAdmin.isVerified) {
+      let updated = false;
+      if (existingAdmin.role !== "admin") {
         existingAdmin.role = "admin";
+        updated = true;
+      }
+      if (!existingAdmin.isVerified) {
         existingAdmin.isVerified = true;
+        updated = true;
+      }
+      if (!existingAdmin.isSuperAdmin) {
+        existingAdmin.isSuperAdmin = true;
+        existingAdmin.fullAccess = true;
+        existingAdmin.manageAccess = true;
+        existingAdmin.adminRoleName = "Super Admin";
+        updated = true;
+      }
+      if (updated) {
         await existingAdmin.save();
       }
     }

@@ -12,10 +12,12 @@ exports.requireAuth = async (req, res, next) => {
   }
 
   if (!token) {
+    const isAdminRoute = Boolean((req.originalUrl && req.originalUrl.includes("admin")) || (req.headers.referer && req.headers.referer.includes("admin")));
     if (req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json")) {
       return res.status(401).json({ success: false, message: "Authentication required. Please log in." });
     }
-    return res.redirect("/login?error=" + encodeURIComponent("Authentication required. Please select your role and log in to access your dashboard."));
+    const redirectTarget = isAdminRoute ? "/admin-panel" : "/login";
+    return res.redirect(`${redirectTarget}?error=` + encodeURIComponent("Authentication required. Please log in to access admin panel."));
   }
 
   try {
@@ -31,7 +33,8 @@ exports.requireAuth = async (req, res, next) => {
       if (req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json")) {
         return res.status(401).json({ success: false, message: discMsg });
       }
-      return res.redirect("/login?message=" + encodeURIComponent(discMsg));
+      const redirectTarget = dbUser.role === "admin" ? "/admin-panel" : "/login";
+      return res.redirect(`${redirectTarget}?message=` + encodeURIComponent(discMsg));
     }
 
     let formattedName = decoded.name || decoded.email;
@@ -58,10 +61,12 @@ exports.requireAuth = async (req, res, next) => {
     }).catch(() => {});
 
     res.clearCookie("token");
+    const isAdminRoute = Boolean((req.originalUrl && req.originalUrl.includes("admin")) || (req.headers.referer && req.headers.referer.includes("admin")));
     if (req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json")) {
       return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
     }
-    return res.redirect("/login?error=" + encodeURIComponent("Session expired. Please log in again."));
+    const redirectTarget = isAdminRoute ? "/admin-panel" : "/login";
+    return res.redirect(`${redirectTarget}?error=` + encodeURIComponent("Session expired. Please log in again."));
   }
 };
 
@@ -144,4 +149,55 @@ exports.requireApprovedTutor = async (req, res, next) => {
 
   next();
 };
+
+exports.requirePermission = (requiredPermission) => {
+  return async (req, res, next) => {
+    if (!req.user || req.user.role !== "admin") {
+      if (req.xhr || (req.headers.accept && req.headers.accept.includes("json")) || req.headers["content-type"]?.includes("json")) {
+        return res.status(403).json({ success: false, message: "Access Denied: Admin privileges required." });
+      }
+      return res.redirect("/admin-panel?error=" + encodeURIComponent("Access Denied: Admin privileges required."));
+    }
+
+    try {
+      const User = require("../models/User");
+      const dbUser = await User.findById(req.user.id).select("email role isSuperAdmin fullAccess manageAccess permissions accountStatus");
+
+      if (!dbUser || dbUser.role !== "admin" || dbUser.accountStatus === "Discontinued") {
+        return res.status(403).json({ success: false, message: "Access Denied: Invalid or discontinued admin account." });
+      }
+
+      const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
+      const isSuper = Boolean(dbUser.isSuperAdmin || dbUser.email === superAdminEmail);
+
+      req.user.isSuperAdmin = isSuper;
+      req.user.fullAccess = isSuper ? true : Boolean(dbUser.fullAccess);
+      req.user.manageAccess = isSuper;
+      req.user.permissions = Array.isArray(dbUser.permissions) ? dbUser.permissions : [];
+
+      if (requiredPermission === "manageAccess") {
+        if (isSuper) return next();
+        return res.status(403).json({ success: false, message: "Access Denied: Manage Access is strictly restricted to Super Admin." });
+      }
+
+      if (isSuper) {
+        return next();
+      }
+
+      if (dbUser.fullAccess) {
+        return next();
+      }
+
+      if (Array.isArray(dbUser.permissions) && dbUser.permissions.includes(requiredPermission)) {
+        return next();
+      }
+
+      return res.status(403).json({ success: false, message: `Access Denied: You do not have permission to access '${requiredPermission}'.` });
+    } catch (err) {
+      console.error("requirePermission Middleware Error:", err);
+      return res.status(500).json({ success: false, message: "Server error verifying permissions." });
+    }
+  };
+};
+
 
