@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaVideo, FaGraduationCap, FaCircle, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
 
 export const VideoHeader = ({
   subject = 'Online Tutoring Session',
@@ -10,21 +11,21 @@ export const VideoHeader = ({
     <header className="call-header">
       <div className="call-title-area">
         <div className="call-logo">
-          <i className="fa-solid fa-video"></i> HomeTutor Classroom
+          <FaVideo style={{ marginRight: '6px' }} /> HomeTutor Classroom
         </div>
         <span className="class-badge">
-          <i className="fa-solid fa-graduation-cap"></i> {subject}
+          <FaGraduationCap style={{ marginRight: '6px' }} /> {subject}
         </span>
       </div>
 
       <div className="peer-info">
         <span className={`status-badge ${statusState}`}>
           {statusState === 'connected' ? (
-            <i className="fa-solid fa-circle" style={{ fontSize: '9px', color: '#34d399' }}></i>
+            <FaCircle style={{ fontSize: '9px', color: '#34d399', marginRight: '6px' }} />
           ) : statusState === 'disconnected' ? (
-            <i className="fa-solid fa-triangle-exclamation"></i>
+            <FaExclamationTriangle style={{ marginRight: '6px' }} />
           ) : (
-            <i className="fa-solid fa-spinner fa-spin"></i>
+            <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '6px' }} />
           )}
           {' '}{statusText}
         </span>
@@ -33,3 +34,4 @@ export const VideoHeader = ({
     </header>
   );
 };
+

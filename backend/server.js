@@ -214,6 +214,16 @@ app.use("/api/content", contentRoutes);
 // Start Automated 30-Day Progress Report Background Scheduler Service
 initReportScheduler();
 
+// Backend Health Check Endpoint for Render & Monitoring
+app.get(["/health", "/api/health"], (req, res) => {
+  return res.status(200).json({
+    status: "ok",
+    service: "Smart HomeTutor API",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Public Academic Subjects & Boards Catalog Endpoint
 const adminController = require("./controllers/adminController");
 app.get("/api/subjects", adminController.getSubjects);

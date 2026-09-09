@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getSocket } from '../../services/socket';
+import { FaVideo, FaPhoneSlash, FaPhoneVolume } from 'react-icons/fa';
 
 export const SocketCallListener = () => {
   const { userId, userRole, userName } = useAuth();
@@ -12,19 +13,19 @@ export const SocketCallListener = () => {
     const socket = getSocket();
     if (!socket) return;
 
-    if (userId) {
-      const uidStr = String(userId);
-      socket.emit('join', { userId: uidStr, role: userRole });
-      socket.emit('register-user', { userId: uidStr });
-      socket.emit('check-active-call', { userId: uidStr });
+    const currentUserIdStr = userId ? String(userId) : '';
+
+    if (currentUserIdStr) {
+      socket.emit('join', { userId: currentUserIdStr, role: userRole });
+      socket.emit('register-user', { userId: currentUserIdStr });
+      socket.emit('check-active-call', { userId: currentUserIdStr });
     }
 
     const onConnect = () => {
-      if (userId) {
-        const uidStr = String(userId);
-        socket.emit('join', { userId: uidStr, role: userRole });
-        socket.emit('register-user', { userId: uidStr });
-        socket.emit('check-active-call', { userId: uidStr });
+      if (currentUserIdStr) {
+        socket.emit('join', { userId: currentUserIdStr, role: userRole });
+        socket.emit('register-user', { userId: currentUserIdStr });
+        socket.emit('check-active-call', { userId: currentUserIdStr });
       }
     };
 
@@ -32,7 +33,7 @@ export const SocketCallListener = () => {
 
     const handleActiveStatus = ({ hasActiveCall, call }) => {
       if (hasActiveCall && call && call.status === 'calling') {
-        if (call.callerId === uidStr) {
+        if (call.callerId === currentUserIdStr) {
           setOutgoingCall({
             bookingId: call.bookingId,
             recipientName: call.recipientName || 'Student',
@@ -127,6 +128,7 @@ export const SocketCallListener = () => {
     socket.on('video-error', handleVideoError);
 
     return () => {
+      socket.off('connect', onConnect);
       socket.off('active-call-status', handleActiveStatus);
       socket.off('incoming-video-call', handleIncomingCall);
       socket.off('incoming-call', handleIncomingCall);
@@ -138,7 +140,7 @@ export const SocketCallListener = () => {
       socket.off('call-timeout', handleCallTimeout);
       socket.off('video-error', handleVideoError);
     };
-  }, [userId]);
+  }, [userId, userRole]);
 
   const acceptCall = () => {
     const socket = getSocket();
@@ -162,7 +164,6 @@ export const SocketCallListener = () => {
     }
     setOutgoingCall(null);
   };
-
 
   // Render Incoming Call Modal (for Student)
   if (incomingCall) {
@@ -208,7 +209,7 @@ export const SocketCallListener = () => {
               border: '2px solid rgba(52, 211, 153, 0.4)',
             }}
           >
-            <i className="fa-solid fa-video fa-beat"></i>
+            <FaVideo style={{ animation: 'pulse 1.5s infinite' }} />
           </div>
           <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>
             Incoming Video Call
@@ -242,7 +243,7 @@ export const SocketCallListener = () => {
                 }}
                 onClick={declineCall}
               >
-                <i className="fa-solid fa-phone-slash"></i> Reject
+                <FaPhoneSlash /> Reject
               </button>
               <button
                 type="button"
@@ -262,7 +263,7 @@ export const SocketCallListener = () => {
                 }}
                 onClick={acceptCall}
               >
-                <i className="fa-solid fa-video"></i> Accept
+                <FaVideo /> Accept
               </button>
             </div>
           )}
@@ -315,7 +316,7 @@ export const SocketCallListener = () => {
               border: '2px solid rgba(56, 189, 248, 0.4)',
             }}
           >
-            <i className="fa-solid fa-phone-volume fa-pulse"></i>
+            <FaPhoneVolume style={{ animation: 'pulse 1.5s infinite' }} />
           </div>
           <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>
             Calling Student...
@@ -347,7 +348,7 @@ export const SocketCallListener = () => {
               }}
               onClick={cancelCall}
             >
-              <i className="fa-solid fa-phone-slash"></i> Cancel Call
+              <FaPhoneSlash /> Cancel Call
             </button>
           )}
         </div>
@@ -357,3 +358,4 @@ export const SocketCallListener = () => {
 
   return null;
 };
+

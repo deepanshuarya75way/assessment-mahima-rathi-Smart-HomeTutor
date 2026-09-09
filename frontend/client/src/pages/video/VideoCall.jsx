@@ -5,6 +5,8 @@ import { getSocket } from '../../services/socket';
 import { VideoHeader } from '../../components/video/VideoHeader';
 import { VideoControls } from '../../components/video/VideoControls';
 import { VideoErrorOverlay } from '../../components/video/VideoErrorOverlay';
+import { FaVideoSlash, FaMicrophone, FaMicrophoneSlash, FaSignal } from 'react-icons/fa';
+
 
 
 export const VideoCall = () => {
@@ -930,9 +932,9 @@ export const VideoCall = () => {
             </h3>
             <p>
               {isPeerVideoOff ? (
-                <><i className="fa-solid fa-video-slash"></i> Video stream paused by participant</>
+                <><FaVideoSlash style={{ marginRight: '6px' }} /> Video stream paused by participant</>
               ) : (
-                <><i className="fa-solid fa-signal"></i> Establishing secure peer-to-peer WebRTC connection...</>
+                <><FaSignal style={{ marginRight: '6px' }} /> Establishing secure peer-to-peer WebRTC connection...</>
               )}
             </p>
           </div>
@@ -941,7 +943,7 @@ export const VideoCall = () => {
         {/* PEER MUTED MIC BADGE */}
         {isPeerAudioMuted && (
           <div className="peer-muted-badge">
-            <i className="fa-solid fa-microphone-slash"></i> {peerUser.name} is muted
+            <FaMicrophoneSlash style={{ marginRight: '6px' }} /> {peerUser.name} is muted
           </div>
         )}
 
@@ -963,14 +965,18 @@ export const VideoCall = () => {
             <div className="local-placeholder" style={{ display: 'flex' }}>
               <div className="local-avatar">{userAvatar}</div>
               <span className="cam-off-badge">
-                <i className="fa-solid fa-video-slash"></i> Camera Off
+                <FaVideoSlash style={{ marginRight: '4px' }} /> Camera Off
               </span>
             </div>
           )}
 
           <div className="local-user-label">
             <span>
-              <i className={`fa-solid ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'}`} style={isAudioMuted ? { color: '#ef4444' } : undefined}></i>
+              {isAudioMuted ? (
+                <FaMicrophoneSlash style={{ color: '#ef4444' }} />
+              ) : (
+                <FaMicrophone />
+              )}
             </span>
             <span>You ({user.name})</span>
           </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaDesktop, FaPhoneSlash } from 'react-icons/fa';
 
 export const VideoControls = ({
   isAudioMuted,
@@ -17,7 +18,7 @@ export const VideoControls = ({
         title="Mute / Unmute Microphone"
         onClick={onToggleAudio}
       >
-        <i className={`fa-solid ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
+        {isAudioMuted ? <FaMicrophoneSlash /> : <FaMicrophone />}
       </button>
 
       <button
@@ -26,7 +27,7 @@ export const VideoControls = ({
         title="Camera On / Off"
         onClick={onToggleVideo}
       >
-        <i className={`fa-solid ${isVideoOff ? 'fa-video-slash' : 'fa-video'}`}></i>
+        {isVideoOff ? <FaVideoSlash /> : <FaVideo />}
       </button>
 
       <button
@@ -36,7 +37,7 @@ export const VideoControls = ({
         title="Share Screen"
         onClick={onToggleScreen}
       >
-        <i className="fa-solid fa-desktop"></i>
+        <FaDesktop />
       </button>
 
       <button
@@ -44,8 +45,9 @@ export const VideoControls = ({
         className="control-btn end-call"
         onClick={onEndCall}
       >
-        <i className="fa-solid fa-phone-slash"></i> End Call
+        <FaPhoneSlash style={{ marginRight: '6px' }} /> End Call
       </button>
     </footer>
   );
 };
+

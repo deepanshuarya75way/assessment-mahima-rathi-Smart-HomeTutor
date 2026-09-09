@@ -6,56 +6,105 @@ const isValidEmailFormat = (email) => {
   return emailRegex.test(String(email).toLowerCase().trim());
 };
 
+// Singleton transporter instance
+let cachedTransporter = null;
+
+/**
+ * Get SMTP configuration from environment variables
+ */
+const getSmtpConfig = () => {
+  const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT) || 587;
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER || "";
+  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || "";
+  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || (user ? `"Smart HomeTutor" <${user}>` : `"Smart HomeTutor" <noreply@smarthometutor.com>`);
+  return { host, port, user, pass, from };
+};
+
+/**
+ * Get or initialize reusable singleton Nodemailer transporter with connection pooling
+ */
+const getTransporter = () => {
+  const config = getSmtpConfig();
+  const isPlaceholder = !config.user || !config.pass || config.pass === "app_password_placeholder";
+
+  if (isPlaceholder) {
+    return { isPlaceholder: true, config, transporter: null };
+  }
+
+  if (!cachedTransporter) {
+    console.log(`🔌 [EMAIL SERVICE] Initializing pooled SMTP Transporter (${config.host}:${config.port})...`);
+    cachedTransporter = nodemailer.createTransport({
+      pool: true,
+      host: config.host,
+      port: config.port,
+      secure: config.port === 465,
+      auth: {
+        user: config.user,
+        pass: config.pass,
+      },
+      maxConnections: 5,
+      maxMessages: 100,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+  }
+
+  return { transporter: cachedTransporter, config, isPlaceholder: false };
+};
+
+/**
+ * Helper to dispatch mail with timeout protection and timing diagnostic logging
+ */
+const dispatchEmail = async (mailOptions, timeoutMs = 7000) => {
+  const { transporter, config, isPlaceholder } = getTransporter();
+
+  if (isPlaceholder) {
+    console.warn(`⚠️ [EMAIL SERVICE] SMTP credentials placeholders detected. Simulating email delivery to ${mailOptions.to}.`);
+    return { success: true, isDevConsole: true, messageId: "dev-console-simulated-id" };
+  }
+
+  const startTime = Date.now();
+  console.log(`📤 [EMAIL SERVICE] Starting SMTP send to ${mailOptions.to}...`);
+
+  const sendPromise = transporter.sendMail(mailOptions);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`SMTP delivery response timeout (${Math.round(timeoutMs / 1000)}s limit exceeded).`)), timeoutMs)
+  );
+
+  const info = await Promise.race([sendPromise, timeoutPromise]);
+  const duration = Date.now() - startTime;
+  console.log(`✅ [EMAIL SERVICE SUCCESS] SMTP send completed in ${duration}ms (Message ID: ${info.messageId || info.response || 'OK'})`);
+  return info;
+};
+
 /**
  * Send real email verification code via Nodemailer SMTP
  * @param {Object} options
- * @param {string} options.to - 
- * @param {string} options.otp -
- * @param {string} [options.name] - 
+ * @param {string} options.to
+ * @param {string} options.otp
+ * @param {string} [options.name]
  */
 const sendVerificationEmail = async ({ to, otp, name }) => {
   const normalizedEmail = String(to).toLowerCase().trim();
-
 
   if (!isValidEmailFormat(normalizedEmail)) {
     throw new Error("Please enter a valid email address.");
   }
 
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
-  const from = process.env.EMAIL_FROM || `"Smart HomeTutor" <${user}>`;
+  const { config, isPlaceholder } = getTransporter();
 
   console.log(`📧 [EMAIL OTP GENERATED] Recipient: ${normalizedEmail}`);
-  console.log(`🔑 [VERIFICATION CODE]: ${otp}`);
-
-
-  const isPlaceholder = !user || !pass || pass === "app_password_placeholder";
-
   if (isPlaceholder) {
-    console.warn("⚠️ SMTP credentials placeholders detected in .env. OTP logged to console above for verification testing.");
-    return { success: true, isDevConsole: true, messageId: "dev-console-otp" };
+    console.log(`🔑 [DEV VERIFICATION CODE]: ${otp}`);
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: {
-      user,
-      pass,
-    },
-    connectionTimeout: 8000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
-
   const mailOptions = {
-    from,
+    from: config.from,
     to: normalizedEmail,
     subject: "Smart HomeTutor - Verify Your Email Address (6-Digit OTP)",
     html: `
@@ -88,18 +137,10 @@ const sendVerificationEmail = async ({ to, otp, name }) => {
   };
 
   try {
-    console.log(`📤 [EMAIL SERVICE] Delivering verification email to ${normalizedEmail}...`);
-    const emailPromise = transporter.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("SMTP delivery response timeout (6s limit exceeded).")), 6000)
-    );
-
-    const info = await Promise.race([emailPromise, timeoutPromise]);
-    console.log("✅ [EMAIL SERVICE SUCCESS] Real Verification Email Sent via Nodemailer SMTP:", info.messageId || info.response);
+    const info = await dispatchEmail(mailOptions, 7000);
     return info;
   } catch (err) {
     console.error("❌ [EMAIL SERVICE WARNING] SMTP Delivery Alert:", err.message);
-    console.log(`💡 [FALLBACK OTP LOGGED FOR VERIFICATION]: ${otp} for ${normalizedEmail}`);
     return { success: true, isFallback: true, messageId: "smtp-timeout-fallback" };
   }
 };
@@ -118,37 +159,15 @@ const sendPasswordResetEmail = async ({ to, otp, name }) => {
     throw new Error("Please enter a valid email address.");
   }
 
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
-  const from = process.env.EMAIL_FROM || `"Smart HomeTutor" <${user}>`;
+  const { config, isPlaceholder } = getTransporter();
 
   console.log(`📧 [PASSWORD RESET OTP GENERATED] Recipient: ${normalizedEmail}`);
-  console.log(`🔑 [RESET VERIFICATION CODE]: ${otp}`);
-
-  const isPlaceholder = !user || !pass || pass === "app_password_placeholder";
-
   if (isPlaceholder) {
-    console.warn("⚠️ SMTP credentials placeholders detected in .env. Password Reset OTP logged to console above for verification testing.");
-    return { success: true, isDevConsole: true, messageId: "dev-console-reset-otp" };
+    console.log(`🔑 [DEV RESET CODE]: ${otp}`);
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
-
   const mailOptions = {
-    from,
+    from: config.from,
     to: normalizedEmail,
     subject: "Smart HomeTutor - Password Reset Request (6-Digit OTP)",
     html: `
@@ -181,9 +200,7 @@ const sendPasswordResetEmail = async ({ to, otp, name }) => {
   };
 
   try {
-    console.log(`📤 [EMAIL SERVICE] Delivering password reset email to ${normalizedEmail}...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ [EMAIL SERVICE SUCCESS] Real Password Reset Email Sent via Nodemailer SMTP:", info.messageId || info.response);
+    const info = await dispatchEmail(mailOptions, 7000);
     return info;
   } catch (err) {
     console.error("❌ [EMAIL SERVICE ERROR] Nodemailer SMTP Delivery Error:", err.message);
@@ -207,29 +224,10 @@ const sendEmailWithAttachment = async ({ to, subject, html, text, attachments = 
     throw new Error("Invalid recipient email address.");
   }
 
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
-  const from = process.env.EMAIL_FROM || `"Smart HomeTutor" <${user}>`;
-
-  const isPlaceholder = !user || !pass || pass === "app_password_placeholder";
-
-  if (isPlaceholder) {
-    console.warn(`⚠️ SMTP credentials placeholder detected. Simulating email delivery for ${normalizedEmail}. Subject: ${subject}`);
-    return { success: true, isDevConsole: true, messageId: "dev-console-report-email" };
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
-  });
+  const { config } = getTransporter();
 
   const mailOptions = {
-    from,
+    from: config.from,
     to: normalizedEmail,
     subject,
     text: text || "Please see the attached 30-day progress report PDF.",
@@ -238,9 +236,7 @@ const sendEmailWithAttachment = async ({ to, subject, html, text, attachments = 
   };
 
   try {
-    console.log(`📤 [EMAIL SERVICE] Sending report email with attachment to ${normalizedEmail}...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ [EMAIL SERVICE SUCCESS] Report Email Sent via Nodemailer:", info.messageId || info.response);
+    const info = await dispatchEmail(mailOptions, 10000);
     return info;
   } catch (err) {
     console.error("❌ [EMAIL SERVICE ERROR] Email delivery failed:", err.message);
@@ -265,11 +261,7 @@ const sendAdminAccessConfirmationEmail = async ({ to, name, loginEmail, tempPass
     throw new Error("Invalid recipient email address.");
   }
 
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
-  const from = process.env.EMAIL_FROM || `"Smart HomeTutor Governance" <${user}>`;
+  const { config } = getTransporter();
   const adminLoginUrl = process.env.ADMIN_LOGIN_URL || (process.env.CLIENT_URL ? `${process.env.CLIENT_URL}/admin-panel` : "http://localhost:5000/admin-panel");
 
   console.log(`📧 [ADMIN ACCESS EMAIL GENERATED] Recipient Target Gmail: ${normalizedEmail}`);
@@ -317,7 +309,6 @@ const sendAdminAccessConfirmationEmail = async ({ to, name, loginEmail, tempPass
       textBlocks.push(`• Blog Articles\n  - View\n  - Create\n  - Edit\n  - Delete`);
     }
 
-    // Other non-blog sections
     const nonBlogPerms = permissions.filter(
       (p) => !["blogs.view", "blogs.create", "blogs.edit", "blogs.delete", "blogs", "blog-articles"].includes(p)
     );
@@ -340,25 +331,10 @@ const sendAdminAccessConfirmationEmail = async ({ to, name, loginEmail, tempPass
     accessText = textBlocks.join("\n");
   }
 
-  const isPlaceholder = !user || !pass || pass === "app_password_placeholder";
-
-  if (isPlaceholder) {
-    console.warn(`⚠️ SMTP credentials placeholder detected. Simulating admin access confirmation email delivery for target recipient ${normalizedEmail}.`);
-    return { success: true, isDevConsole: true, messageId: "dev-console-admin-access-email" };
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
-  });
-
   const displayName = name || normalizedEmail.split("@")[0];
 
   const mailOptions = {
-    from,
+    from: process.env.EMAIL_FROM || `"Smart HomeTutor Governance" <${config.user}>`,
     to: normalizedEmail,
     subject: "Admin Access Granted",
     text: `Subject: Admin Access Granted\n\nHello ${displayName},\n\nYou have been granted Admin Staff access.\n\nAccess Granted:\n${accessText}\n\nLogin Email:\n${normalizedEmail}\n\nTemporary Password:\n${tempPassword || "(Unchanged)"}\n\nAdmin Login:\n${adminLoginUrl}\n\nFor security, you are required to change this temporary password after your first login.`,
@@ -414,9 +390,7 @@ const sendAdminAccessConfirmationEmail = async ({ to, name, loginEmail, tempPass
   };
 
   try {
-    console.log(`📤 [EMAIL SERVICE] Delivering Admin Access confirmation email to target recipient: ${normalizedEmail}...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ [EMAIL SERVICE SUCCESS] Admin Access Confirmation Email Sent via Nodemailer to target Gmail:", info.messageId || info.response);
+    const info = await dispatchEmail(mailOptions, 7000);
     return info;
   } catch (err) {
     console.error("❌ [EMAIL SERVICE ERROR] Admin Access email delivery failed:", err.message);
