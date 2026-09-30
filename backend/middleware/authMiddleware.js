@@ -22,8 +22,30 @@ exports.requireAuth = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
+  //validation 
+  const Device = require("../models/Device");
+  if(decoded.deviceId){
+    const device = await Device.findOne({
+      user : decoded.id,
+      deviceId:decoded.deviceId,
+      isActive:true
+    });
 
-    // Import User model to verify account status
+    if(!device){
+      const msg ="This device is no longer active.";
+
+      if(req.xhr || (req.headers.accept && req.headers.accept.includes("json"))||
+        req.headers["content-type"]?.includes("json")){
+          return res.status(401).json({
+            success:false,
+            message:msg
+          });
+        }
+        res.clearCookie("token");
+        return res.redirect("/login?error="+ encodedURIComponent(msg));
+    }
+  }
+
     const User = require("../models/User");
     const dbUser = await User.findById(decoded.id).select("accountStatus name email role");
 

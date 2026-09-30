@@ -31,6 +31,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const complaintRoutes = require("./routes/complaintRoutes");
 const contentRoutes = require("./routes/contentRoutes");
+const deviceRoutes = require("./routes/deviceRoutes");
 const Certificate = require("./models/Certificate");
 const initVideoCallSocket = require("./utils/videoCallSocket");
 const TutorProfile = require("./models/TutorProfile");
@@ -210,6 +211,7 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/content", contentRoutes);
+app.use("/api/devices",deviceRoutes);
 
 // Start Automated 30-Day Progress Report Background Scheduler Service
 initReportScheduler();

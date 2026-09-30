@@ -4,12 +4,13 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
 const Referral = require("../models/Referral");
+const Device = require("../models/Device");
 const { logUserActivity } = require("../utils/activityLogHelper");
 const { createNotification } = require("../utils/notificationHelper");
 const { sendVerificationEmail, sendPasswordResetEmail, isValidEmailFormat } = require("../utils/sendEmail");
 
 const getJwtSecret = () => process.env.JWT_SECRET || "HomeTutor_Secret_Key_2026";
-const sendTokenResponse = (user, statusCode, req, res) => {
+const sendTokenResponse = (user, statusCode, req, res , device=null) => {
   const superAdminEmail = process.env.ADMIN_EMAIL || "useradmin2005@gmail.com";
   const isSuper = Boolean(user.isSuperAdmin || user.email === superAdminEmail);
 
@@ -22,6 +23,9 @@ const sendTokenResponse = (user, statusCode, req, res) => {
     fullAccess: isSuper ? true : Boolean(user.fullAccess),
     manageAccess: isSuper,
     permissions: Array.isArray(user.permissions) ? user.permissions : [],
+    deviceId : device ? device.deviceId :null,
+    deviceDbId: device? device._id :null,
+    sessionVersion : device ? device.sessionVersion :null,
   };
 
   const token = jwt.sign(tokenPayload, getJwtSecret(), { expiresIn: "1d" });
@@ -298,7 +302,7 @@ exports.login = async (req, res) => {
   );
 
   try {
-    const { email, password, role } = req.body || {};
+    const { email, password, role, deviceId } = req.body || {};
 
     if (!email || !password || !role) {
       const msg = "Please enter email, password and select your role.";
@@ -356,6 +360,128 @@ exports.login = async (req, res) => {
         if (isJsonRequest) return res.status(403).json({ success: false, message: msg });
         return res.redirect("/login?error=" + encodeURIComponent(msg));
       }
+      const DeviceId = req.body.deviceId || req.headers["x-device-id"]||req.headers["device-id"];
+     const activeDevice = await Device.findOne({
+      user:user._id,
+      isActive:true,
+      
+     });
+     if(activeDevice && activeDevice.deviceId !==deviceId){
+      const msg="Another device is currently active.Do you want to switch?";
+      if(isJsonRequest){
+        return res.status(409).json({
+          success:false,
+          message:msg,
+          requiresSwitch:true,
+          activeDevice:{
+            id:activeDevice._id,
+            deviceId:activeDevice.deviceId,
+            deviceName: activeDevice.deviceName
+          }
+        });
+      }
+      return res.direct("/login?error="+ encodedURIComponent(msg));
+     }
+     console.log("device id",deviceId);
+
+      let device = await Device.findOne({
+        user:user._id,
+        deviceId:deviceId
+      });
+       console.log("Device  Debug");
+        console.log("User Id:",user._id.toString());
+        console.log("Device ID from Login:",deviceId);
+        console.log("Existing Device:",device?._id?.toString());
+        console.log("Device Active",device?.isActive);
+     //existing device
+      if(device){
+        const activeDevice = await Device.findOne({
+          user:user._id,
+          isActive:true,
+          _id: {$ne: device._id}
+        });
+        if(activeDevice){
+          return res.status(409).json({
+            success:false,
+            message:"another Device is Currently active.",
+            requiresSwitch:true,
+            activeDevice:{
+              id: activeDevice._id,
+              deviceName:activeDevice.deviceName,
+              lastLogin:activeDevice.lastLogin
+            },
+            currentDevice:{
+              id:device._id,
+              deviceName:device.deviceName
+            }
+          });
+        }
+        device.isActive =true;
+        device.lastLogin = new Date();
+        device.sessionVersion +=1;
+        await device.save();
+      }
+      //new device 
+      else{
+        console.log("Check Active Device from new");
+        const activeDevice = await Device.findOne({
+          user:user._id,
+          isActive:true,
+        });
+        console.log("Active Device Found:",activeDevice);
+        if(activeDevice){
+          return res.status(409).json({
+            success:false,
+            message:"Another device ",
+            requiresSwitch:true,
+            activeDevice:{
+              id:activeDevice._id,
+              deviceName:activeDevice.deviceName,
+              lastLogin: activeDevice.lastLogin
+            }
+          });
+        }
+    const deviceCount = await Device.countDocuments({
+      user:user._id
+    });
+    if(deviceCount >=2){
+      return res.status(403).json({
+        success:false,
+        message: "Maxium 2 devices are already registered."
+      });
+    }
+    device = await Device.create({
+      user: user._id,
+      deviceId,
+      deviceName:req.body.deviceName || "unknown Device",
+      userAgent: req.headers["user-agent"] || "",
+      isAddress:req.ip,
+      isActive:false,
+      sessionVersion:0,
+      lastLogin : new Date()
+    });
+     }
+    // const activeDevice = await Device.findOne({
+    //   user:user._id,
+    //   isActive:true,
+    //   _id : {$ne : device._id}
+    // });
+    // if(activeDevice){
+    //   return  res.status(409).json({
+    //     success:false,
+    //     message:"Another device is currently active.",
+    //     requiresSwitch:true,
+    //     activeDevice:{
+    //       id: activeDevice._id,
+    //       deviceName: device.deviceName
+    //     }
+    //   });
+    // }
+    // device.isActive = true;
+    // device.sessionVersion +=1;
+
+    // await device.save();
+    //   }
 
       await logUserActivity({
         userId: user._id,

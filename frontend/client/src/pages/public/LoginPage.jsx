@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { Footer } from '../../components/common/Footer';
+import getDeviceId from '../../utils/deviceId';
 
 export const LoginPage = () => {
   const [searchParams] = useSearchParams();
@@ -87,11 +88,42 @@ export const LoginPage = () => {
           password,
           role,
           remember,
+          deviceId :getDeviceId(),
         }),
       });
 
       const data = await response.json();
+    if(response.status ==409){
+      const switchDevice = window.confirm(
+        '${data.activeDevice?.deviceName || "Another Device" } is currently active.\n\n Do you want to switch?'
+      );
+      if(switchDevice && data.currentDevice?.id){
+        try{
+          const switchResponse = await fetch("/api/devices/switch",{
+            method:"POST",
+            headers:{
+              "Content-Type": "application/json"
+            },
+            credentials:"include",
+            body:JSON.stringify({
+              deviceId:data.currentDevice.id
+            })
+          });
 
+          const switchData = await switchResponse.json();
+          if(switchResponse.ok && switchData.success){
+            window.location.replace('/dashboard/${role}');
+            return ;
+          }
+          setErrorMessage(switchData.message|| "unable to switch device.");
+        }catch(switchError){
+          console.err("Device switch error:",switchError);
+          setErrorMessage("unable to switch device.");
+        }
+        return;
+      }
+      return ;
+    }
       if (response.ok && data.success) {
         window.location.replace(data.redirectUrl || `/dashboard/${role}`);
       } else {
