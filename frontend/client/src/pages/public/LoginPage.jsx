@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { Footer } from '../../components/common/Footer';
-import getDeviceId from '../../utils/deviceId';
+import deviceId  from '../utils/deviceId';
 
 export const LoginPage = () => {
   const [searchParams] = useSearchParams();
@@ -75,8 +75,15 @@ export const LoginPage = () => {
     }
 
     setIsSubmitting(true);
+    let deviceId = localStorage.getItem("deviceId");
 
+      if(!deviceId){
+        deviceId=crypto.randomUUID();
+        localStorage.setItem("deviceId",deviceId);
+      }
+      console.log("Login",deviceId);
     try {
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -88,7 +95,7 @@ export const LoginPage = () => {
           password,
           role,
           remember,
-          deviceId :getDeviceId(),
+          deviceId :deviceId(),
         }),
       });
 
